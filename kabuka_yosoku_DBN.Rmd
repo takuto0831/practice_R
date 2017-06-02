@@ -1,0 +1,66 @@
+---
+title: "Dynamic Bayesian Network"
+output: 
+ html_document:
+    toc: true
+    toc_depth: 3
+---
+#Dynamic Bayesian Network
+
+##library package 
+
+```{r setup, include=FALSE}
+library(quantmod)
+library(deal)
+library(dplyr)
+library(data.table)
+library(ARTIVA)
+```
+
+##dataset
+
+```{r}
+TPX_ln <- getSymbols("TPX", src="yahoo", from=as.Date("2015-1-1"), to=as.Date("2015-12-31"), auto.assign=FALSE) #TOPIX
+CCMP_ln <- getSymbols("CCMP", src="yahoo", from=as.Date("2015-1-1"), to=as.Date("2015-12-31"), auto.assign=FALSE) #ナスダック
+DAX_ln <- getSymbols("DAX", src="yahoo", from=as.Date("2015-1-1"), to=as.Date("2015-12-31"), auto.assign=FALSE) #ドイツ
+CAC_ln <- getSymbols("CAC", src="yahoo", from=as.Date("2015-1-1"), to=as.Date("2015-12-31"), auto.assign=FALSE) #フランス
+```
+
+```{r,eval=FALSE}
+candleChart(TPX_ln, name = "TOPIX", multi.col = TRUE, theme = "white")
+candleChart(CCMP_ln, name = "CCMP", multi.col = TRUE, theme = "white")
+candleChart(DAX_ln, name = "DAX", multi.col = TRUE, theme = "white")
+candleChart(CAC_ln, name = "CAC", multi.col = TRUE, theme = "white")
+```
+
+```{r}
+#データを差分化,table変換,終値抽出
+TPX_ln <- TPX_ln %>% data.table() %>% dplyr::select(TPX.Close)
+CCMP_ln <- CCMP_ln %>% data.table() %>%  dplyr::select(CCMP.Close)
+DAX_ln <- DAX_ln %>% data.table() %>%  dplyr::select(DAX.Close)
+CAC_ln <- CAC_ln %>% data.table() %>%  dplyr::select(CAC.Close)
+
+#行列表記
+#日数が違うもの削除
+kabu <- cbind(TPX_ln, CCMP_ln, CAC_ln,DAX_ln) %>% data.matrix()
+kabu <- t(kabu)
+kabu
+```
+
+```{r}
+class(kabu)
+# target
+targets <- c("TPX.Close")
+# parents
+parents <- c("CCMP.Close", "DAX.Close", "CAC.Close")
+```
+
+```{r}
+DBN <- ARTIVAnet(
+ targetData <- kabu[targets,],
+ parentData <- kabu[parents,],
+ targetNames <- targets,
+ parentNames <- parents,
+ niter = 1000, #反復回数
+ savePictures = FALSE)
+```

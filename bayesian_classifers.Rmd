@@ -1,0 +1,163 @@
+---
+title: "Bayesian Network Classifiers"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# package install
+
+```{r,message=FALSE}
+library(e1071)
+library(bnlearn)
+library(dplyr)
+library(mlr)
+library(foreach)
+library(xgboost)
+```
+
+## dicision tree algorithm
+
+```{r, message=FALSE}
+cart_func <- function(){
+  #分類したいタスクの定義
+  iris.task <- makeClassifTask(id = "iris_task",data = iris, target =           "Species")
+
+  #学習データ(70%)と検証データ(30%)を抽出するためのインデックス
+  test.index <- sample(1:150, size = 45, replace =  FALSE)
+  train.index <- setdiff(1:150, test.index)
+
+  #パラーメーターチューニング用に訓練データのみを抽出
+  iris.tune.task <- subsetTask(task = iris.task, subset = train.index)
+
+  #学習器の定義
+  tune.learner <- makeLearner(cl = "classif.rpart")
+
+  #5-分割交差検証の実行
+  resampling <- makeResampleDesc(method =  "CV", iters = 5L)
+
+  #グリッドサーチの実行の設定
+  control.grid <- makeTuneControlGrid()
+
+  #グリッドサーチのパラメータ空間 
+  param.set <- makeParamSet(
+    makeDiscreteParam("cp", values = c(0.1, 0.01)),
+    makeDiscreteParam("maxdepth", values = c(3, 4)) 
+  )
+
+  #5分割交差検証における評価尺度として正解率(acc)
+  measures <- list(acc)
+
+  #グリッドサーチによるパラメータサーチ
+  tune.result  <- tuneParams(learner = tune.learner,
+                           task = iris.tune.task,
+                           resampling = resampling,
+                           control = control.grid,
+                           par.set = param.set,
+                           measures = measures)
+                          
+  #最適なパラメータでモデル構築
+  train.learner <- makeLearner(cl = "classif.rpart",
+                             cp = tune.result$x$cp,
+                             maxdepth = tune.result$x$maxdepth)
+
+  model <- train(learner = train.learner,
+               task = iris.task,
+               subset = train.index)
+
+  #検証データに対して予測する
+  task.pred <- predict(model, task = iris.task, subset = test.index)
+
+  #決定木によるパフォーマンス
+  performance(task.pred, measures = measures)
+}
+```
+
+### 実行結果
+
+```{r,message=FALSE}
+x <- foreach(i=1:100, .combine = c) %do% cart_func()
+```
+
+```{r}
+mean(x)
+```
+
+
+## naive Bayes
+
+```{r, message=FALSE}
+nb_func <- function(){
+  #分類したいタスクの定義
+  iris.task <- makeClassifTask(id = "iris_task",data = iris, target = "Species")
+
+  #学習データ(70%)と検証データ(30%)を抽出するためのインデックス
+  test.index <- sample(1:150, size = 30, replace =  FALSE)
+  train.index <- setdiff(1:150, test.index)
+
+  #正解率(acc)
+  measures <- list(acc)
+
+  model <- train(learner = "classif.naiveBayes",
+               task = iris.task,
+               subset = train.index)
+
+  #検証データに対して予測する
+  task.pred <- predict(model,task = iris.task, subset = test.index)
+  
+  #naiveBayesによるパフォーマンス
+  performance(task.pred, measures = measures)
+}
+```
+
+### 実行結果
+
+```{r}
+x <- foreach(i=1:100, .combine = c) %do% nb_func()
+mean(x)
+```
+
+## xgboost
+
+```{r, message=FALSE}
+xgboost_func <- function(){
+  #分類したいタスクの定義
+  iris.task <- makeClassifTask(id = "iris_task",data = iris, target = "Species")
+
+  #学習データ(70%)と検証データ(30%)を抽出するためのインデックス
+  test.index <- sample(1:150, size = 30, replace =  FALSE)
+  train.index <- setdiff(1:150, test.index)
+
+  #正解率(acc)
+  measures <- list(acc)
+
+  model <- train(learner = "classif.xgboost",
+               task = iris.task,
+               subset = train.index)
+
+  #検証データに対して予測する
+  task.pred <- predict(model,task = iris.task, subset = test.index)
+  
+  #naiveBayesによるパフォーマンス
+  performance(task.pred, measures = measures)
+}
+```
+
+### 実行結果
+
+```{r}
+x <- foreach(i=1:100, .combine = c) %do% xgboost_func()
+mean(x)
+```
+
+## plus
+
+```{r}
+plotLearnerPrediction(learner = "classif.xgboost",task = iris.task)
+```
+
