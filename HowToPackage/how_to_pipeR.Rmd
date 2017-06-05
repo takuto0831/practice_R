@@ -1,0 +1,171 @@
+---
+title: "pipeR"
+author: "takuto kotsubo"
+date: "2017年6月4日"
+output: html_document
+---
+
+# web page
+
+[PipeR introduction](https://renkun.me/pipeR-tutorial/index.html)
+[PipeR tutorial github](https://github.com/renkun-ken/pipeR/blob/master/README.ja.md)
+[keyboard shortcuts](https://support.rstudio.com/hc/en-us/articles/200711853-Keyboard-Shortcuts)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# package
+
+```{r, eval=FALSE}
+install.packages("devtools")
+devtools::install_github("renkun-ken/pipeR")
+```
+
+```{r, message=FALSE}
+library(devtools)
+library(pipeR)
+library(dplyr)
+```
+
+
+# short cut key mark
+
+%>%  ctrl + shift + M  
+<-   alt + -            
+%>>% 
+
+# short cut key action
+ford : all alt + o
+unfold : shift + alt + o
+insert chunk : ctrl + alt + I
+run the current chunk : ctrl + alt + C
+# pipe 
+
+```{r}
+# bad example
+plot(density(sample(mtcars$mpg, size = 10000, replace =  TRUE),
+             kernel =  "gaussian"), col = "red", main = "density of mpg(bootstrap)")
+
+# good example for operator
+mtcars$mpg %>>%
+  sample(size = 1000, replace = TRUE) %>>%
+  density(kernel = "gaussian") %>>%
+  plot(col = "red", main = "density of mpg(bootstrap)")
+
+# good example for object
+Pipe(mtcars$mpg) $
+  sample(size = 10000, replace = TRUE) $
+  density(kernel = "gaussian") $
+  plot(col = "red", main = "density of mpg(bootstrap)")
+
+```
+
+# example
+
+```{r}
+rnorm(100) %>>%
+  plot(col = "orange")
+
+rnorm(100) %>>%
+  plot(col = "orange", main = length(.))
+
+# must need ()
+rnorm(100) %>>%
+  stats::median()
+
+rnorm(100) %>>%
+  graphics::plot(col = "blue")
+
+```
+
+```{r}
+mtcars %>>%
+  {lm(mpg ~ cyl + wt, data = .)}
+
+mtcars %>>%
+  (lm(mpg ~ cyl + wt, data = .))
+
+mtcars %>>%
+  (df ~ lm(mpg ~ ., data = df))
+
+mtcars %>>%
+  subset(select = c(mpg, wt, cyl)) %>>%
+  (x ~ plot(mpg ~ ., data = x))
+```
+
+# side effect includes for pipe
+
+```{r}
+# keep pipe line
+mtcars %>>%
+  subset(mpg >= quantile(mpg, 0.05) & mpg <= quantile(mpg, 0.95)) %>>%
+  (~ plot(mpg ~ wt, data = .)) %>>%
+  (lm(mpg ~ wt, data = .)) %>>%
+  summary()
+  
+mtcars %>>%
+  subset(mpg >= quantile(mpg, 0.05) & mpg <= quantile(mpg, 0.95)) %>>%
+  (~ cat("rows:", nrow(.), "\n")) %>>%
+  summary()
+
+mtcars %>>%
+  (? ncol(.)) %>>%
+  summary
+```
+
+# pipe needs substitution
+
+```{r}
+mtcars %>>%
+  (lm(formula = mpg ~ wt + cyl, data =.)) %>>%
+  (~ lm_mtcars) %>>% 
+  summary
+# check it
+lm_mtcars  
+
+mtcars %>>%
+  (~ summ <- summary(.)) %>>% 
+  (lm(formula = mpg ~ wt + cyl, data =.)) %>>%
+  summary
+
+#check it
+summ
+```
+
+summ に代入しながら,lm_mtcarsにも代入してsummaryを実行
+
+```{r}
+mtcars %>>%
+  (~ summary(.) -> summ) %>>%
+  (lm(formula = mpg ~ wt + cyl, data = .) -> lm_mtcars) %>>%
+  summary
+```
+
+# extract factor for object
+
+```{r}
+mtcars %>>%
+  (lm(mpg ~ wt + cyl, data = .)) %>>%
+  (~ lm_mtcars) %>>%
+  summary %>>%
+  (r.squared)
+```
+
+# compatibility with dplyr
+
+```{r}
+mtcars %>>%
+  filter(mpg <= mean(mpg)) %>>% # mean(mpg)以下の行を抽出 
+  select(mpg, wt, cyl) %>>%
+  (~ plot(.)) %>>%
+  (lm(mpg ~ wt + cyl, data = .) -> model) %>>%
+  (summary(.) -> summ) %>>%
+  (coefficients)
+
+```
+
+
+
+
+

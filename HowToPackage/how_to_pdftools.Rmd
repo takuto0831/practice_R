@@ -1,0 +1,63 @@
+---
+title: "pdftools"
+author: "takuto kotsubo"
+date: "2017年6月4日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, eval = FALSE}
+install.packages("pdftools")
+```
+
+
+```{r}
+library(pdftools)
+library(dplyr)
+library(formattable)
+library(purrr)
+```
+
+```{r}
+
+path <- system.file("doc/zoo.pdf", package = "zoo")
+res.info <- pdf_info(pdf = path)
+
+res.info %>% names()
+
+res.info$pages
+
+res.info$created
+
+res.info$keys$Author
+```
+
+```{r}
+res <- pdf_text(path)
+res[1] %>% {
+    nchar(.) %>% print()
+    strtrim(., 300)
+}
+```
+
+```{r}
+pdf_fonts(path) %>% formattable(list(embedded = formatter("span", 
+    style = x ~ style(color = ifelse(x, "green", 
+        "red")), x ~ icontext(ifelse(x, "ok", 
+        "remove"), ifelse(x, "TRUE", "FALSE")))))
+```
+
+
+```{r}
+res.toc <- pdf_toc(path)
+res.toc %>% class()
+
+# 章だけを抽出
+res.toc$children %>% map_chr(c("title"))
+
+res.toc %>% unlist()
+```
+

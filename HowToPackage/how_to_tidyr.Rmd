@@ -1,0 +1,12 @@
+---
+title: "tidyr package"
+author: "takuto kotsubo"
+date: "2017年6月4日"
+output: html_document
+---
+
+[tydir for blog](http://uribo.hatenablog.com/entry/2015/12/01/055000)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```

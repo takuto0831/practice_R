@@ -1,0 +1,131 @@
+---
+title: "G1DBN_package"
+author: "kotsubotakuto"
+date: "2017年5月17日"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# G1DBN packageについて
+
+## packageインストール
+```{r,eval=FALSE}
+install.packages("G1DBN")
+```
+
+```{r,message=FALSE}
+library(G1DBN)
+```
+
+
+## data set
+
+arth800line:Arabidopsis Thaliana temporal gene expression data
+/シロイヌナズナの遺伝子発現情報(対数変換)
+
+```{r}
+data(arth800line)
+dim(arth800line) 
+head(arth800line)[,1:4]
+tail(arth800line)[,1:4]
+rownames(arth800line)
+```
+
+800個の遺伝子と23個の時系列データ、時系列データは8-1は1回目の実験で時刻は8時という表しかた。
+
+### example
+
+```{r}
+id<-c(60, 141, 260, 333, 365, 424, 441, 512, 521, 578, 789, 799)
+## plot first ten time series
+plot(1:23,arth800line[,60],type="l",ylim=c(2,12), xlab="Time",
+     ylab="Log2 transformed expression",lwd=2,
+     main="Log2 transformed expression of a subset of genes of A. Thaliana")
+     color=1
+     for (i in id){
+       color=color+1
+       lines(1:23,arth800line[,i],col=color,lwd=2)
+     }
+```
+
+```{r}
+## number of genes
+p <- 10
+## the network - adjacency Matrix
+#入力:number of genes, edges proportion, range
+MyNet <- SimulNetworkAdjMatrix(p,0.05,c(-1.5,-0.5,0.5,1.5))
+
+#出力:$Vertices$Regulated 調整されたラベル,$AdjMatrix 隣接行列,$A ラベルの値
+MyNet
+
+## SIMULATING THE TIME SERIES EXPERIMENTS
+## number of time points
+n <- 20
+## initializing the B vector
+B <- runif(p,-1,1)
+## initializing the variance of the noise
+sigmaEps <- runif(p,0.1,0.5)
+## initializing the process Xt
+X0 <- B + rnorm(p,0,sigmaEps*10)
+## the times series process
+#入力:matrix(p×p),vector(p×1),vector(p×1),sigmaEps,n
+Xn <- SimulGeneExpressionAR1(MyNet$A,B,X0,sigmaEps,n)
+Xn
+
+## NETWORK INFERENCE WITH G1DBN
+## STEP 1 - The first step score matrix
+
+#出力:A list with out$S1ls a matrix with min(r; p) rows (=target genes) and min(d; p) columns (=predictorgenes) containing the scores
+S1 <- DBNScoreStep1(Xn, method='ls')
+## Building the edges of the network inferred after Step1
+alpha1 <- 0.5
+G1 <- BuildEdges(S1$S1ls,threshold=alpha1,dec=FALSE)
+G1
+## STEP 2- The second step score matrix
+S2 <- DBNScoreStep2(S1$S1ls, Xn, method='ls', alpha1)
+## Building the edges of the network inferred after Step2
+alpha2 <- 0.05
+G2 <- BuildEdges(S2,threshold=alpha2,dec=FALSE)
+G2
+
+## Building the edges of the simulation Graph
+Gsimul <- BuildEdges(MyNet$AdjMatrix,threshold=0,dec=TRUE)
+Gsimul
+
+## PRcurve
+pr1<-PRcurve(score=S1$S1ls,validMat=abs(MyNet$AdjMatrix)>0,dec=FALSE)
+## compute score S2 from S1
+## depending on the generated data, the threshold alpha1 has to be chosen differently.
+alpha1=0.8
+S2<-DBNScoreStep2(S1=S1$S1ls,data=Xn,alpha1=alpha1)
+pr2_0.8<-PRcurve(score=S2,validMat=abs(MyNet$AdjMatrix)>0,dec=FALSE)
+alpha1=0.6
+S2<-DBNScoreStep2(S1=S1$S1ls,data=Xn,alpha1=alpha1)
+pr2_0.6<-PRcurve(score=S2,validMat=abs(MyNet$AdjMatrix)>0,dec=FALSE)
+alpha1=0.4
+S2<-DBNScoreStep2(S1=S1$S1ls,data=Xn,alpha1=alpha1)
+pr2_0.4<-PRcurve(score=S2,validMat=abs(MyNet$AdjMatrix)>0,dec=FALSE)
+alpha1=0.2
+S2<-DBNScoreStep2(S1=S1$S1ls,data=Xn,alpha1=alpha1)
+pr2_0.2<-PRcurve(score=S2,validMat=abs(MyNet$AdjMatrix)>0,dec=FALSE)
+plot(pr1$recall,pr1$precision,type="l",main="PR curves after both Step1 and Step2",
+ylab="PPV", xlab="Sensitivity",lwd=2, xlim=c(0,1),ylim=c(0,1),lty=2)
+lines(pr2_0.8$recall,pr2_0.8$precision, col=3,lwd=2)
+lines(pr2_0.6$recall,pr2_0.6$precision, col=4,lwd=2)
+lines(pr2_0.4$recall,pr2_0.4$precision, col=5,lwd=2)
+lines(pr2_0.2$recall,pr2_0.2$precision, col=6,lwd=2)
+lines(0:1,c(0,0),lty=3)
+lines(0:1,c(1,1),lty=3)
+lines(c(0,0),0:1,lty=3)
+lines(c(1,1),0:1,lty=3)
+leg=c("Step 1", "Step 2 (alpha1=0.8)", "Step 2 (alpha1=0.6)",
+"Step 2 (alpha1=0.4)", "Step 2 (alpha1=0.2)")
+legend(0,0.265, leg, lty=c(2,1,1,1,1), col=c(1,3,4,5,6),lwd=array(2,5))
+```
+
