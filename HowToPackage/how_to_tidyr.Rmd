@@ -14,16 +14,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyr)
 library(ggplot2)
-library(readxl)
 library(broom)
 library(dplyr)
 library(readr)
 library(pipeR)
 library(magrittr)
-#devtools::install_github("richfitz/remoji")
-library(remoji)
-quartzFonts(YuGo = quartzFont(rep("YuGo-Medium", 4)))
-theme_set(theme_classic(base_size = 12, base_family = "YuGo"))
 ```
 
 ```{r}
