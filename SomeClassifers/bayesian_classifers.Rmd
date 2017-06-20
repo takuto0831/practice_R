@@ -96,7 +96,7 @@ nb_func <- function(){
   #分類したいタスクの定義
   iris.task <- makeClassifTask(id = "iris_task",data = iris, target = "Species")
 
-  #学習データ(70%)と検証データ(30%)を抽出するためのインデックス
+  #学習データ(80%)と検証データ(20%)を抽出するためのインデックス
   test.index <- sample(1:150, size = 30, replace =  FALSE)
   train.index <- setdiff(1:150, test.index)
 
