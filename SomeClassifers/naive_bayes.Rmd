@@ -19,13 +19,16 @@ library(e1071)
 
 ## e1071package
 
+## naive bayes 
+
 ```{r}
 data(iris)
-nb <- naiveBayes(Species ~ ., data = iris)
+train.num <- sample(1:150, size = 150 * 0.7, replace = FALSE)
+test.num <- setdiff(1:150, train.num)
+nb <- naiveBayes(Species ~ ., data = iris, subset = train.num)
 nb
-str(nb)
 
-table(predict(nb,iris[,-5]),iris[,5])
+table(predict(nb,iris[test.num,-5]),iris[test.num,5])
 ```
 
 
