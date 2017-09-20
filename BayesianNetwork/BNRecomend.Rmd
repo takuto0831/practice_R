@@ -1,0 +1,336 @@
+---
+title: "Bayesian Network Recommend System"
+author: "takuto kotsubo"
+date: "2017年7月20日"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls(all=TRUE))
+```
+
+# パッケージ読み込み
+
+```{r, message=FALSE}
+# biocLite("Rgraphviz")
+library(bnlearn)
+library(dplyr)
+library(pipeR)
+library(Matrix)
+library(Rgraphviz)
+```
+
+# Bayesian network classifier 1
+
+まずはデータをそのまま利用して調べる。
+
+## Normal data
+
+```{r, include=FALSE}
+train1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/normal_data/train1.csv",colClasses = "factor", sep = ",", header = TRUE)
+test1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/normal_data/test1.csv",colClasses = "factor", sep = ",", header = TRUE)
+# levelsをそろえる
+all_data <- rbind(train1,test1)
+train1 <- all_data[c(1:80000),]
+test1 <- all_data[c(80001:100000),]
+```
+
+```{r}
+# 中身確認
+head(train1,3)
+str(train1)
+```
+
+## データを扱う手法によって変形する
+    
+ユーザー情報、アイテム情報、2つの情報を使って予測を行うため必要なデータを抽出する
+
+```{r, include=FALSE}
+# ユーザー情報 
+train1_user = train1[,c(2:5,25)]
+test1_user = test1[,c(2:5,25)]
+# アイテム情報
+train1_item = train1[,c(1,6:25)]
+test1_item = test1[,c(1,6:25)]
+# ユーザー情報 + アイテム情報
+train1_all = train1[,c(-1,-5)]
+test1_all = test1[,c(-1,-5)]
+```
+
+## 関数定義
+
+```{r}
+# MSEを求める関数
+MseTable <- function(data){
+  # 値を格納する
+  summ = 0
+  for(i in 1:dim(data)[1]){
+    for(j in 1:dim(data)[2]){
+      summ = summ + ((i - j)^2 * data[i,j]) # MSE
+     # summ = summ + (abs(i - j) * data[i,j]) # MAE
+    }
+  }
+  return(summ / sum(data))
+}
+# naive bayes 分類を行う関数
+NaiveBayesFunc <- function(data1, data2){
+  # data1:train data, data2:test data
+  data1 %>>% 
+    naive.bayes("rating") %>>% 
+    (~ graphviz.plot(.,shape = "ellipse")) %>>% # モデルのプロット
+    bn.fit(data1) %>>% 
+    predict(data2) %>>% 
+    (table(predict=.,truth = data2$rating)) %>>%
+    (~ print(ftable(.))) %>>% # 予測と実測値
+    (sprintf("MSE:%4.4f",MseTable(.)))# MSE
+  }
+# Tree Augmented Naive bayes 分類を行う関数
+TANFunc <- function(data1, data2){
+  # data1:train data, data2:test data
+  data1 %>>% 
+    tree.bayes("rating") %>>% 
+    (~ graphviz.plot(.,shape = "ellipse")) %>>% # モデルのプロット
+    bn.fit(data1) %>>% 
+    predict(data2) %>>% 
+    (table(predict=.,truth = data2$rating)) %>>%
+    (~ print(ftable(.))) %>>% # 予測と実測値
+    (sprintf("MSE:%4.4f",MseTable(.)))# MSE
+  }
+```
+## データ指標
+
+ランダムサンプルによる結果との比較
+
+```{r}
+samp <- floor(runif(20000,1,6)) # 1-5 の整数乱数
+mean((samp - as.numeric(test1_user$rating))^2)
+```
+
+
+## check for traing data and test data
+
+### user info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_user,test1_user)
+# TAN
+TANFunc(train1_user, test1_user)
+```
+
+### item info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_item,test1_item)
+# TAN
+TANFunc(train1_item, test1_item)
+```
+
+### user info and item info
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_all,test1_all)
+# TAN
+TANFunc(train1_all, test1_all)
+```
+
+# Bayesian network classifier 2
+
+age のデータを5歳ごとに分割して調べてみる.
+
+## Cut for age by 5 years
+
+```{r, include=FALSE}
+train1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_5/train1.csv",colClasses = "factor", sep = ",", header = TRUE)
+test1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_5/test1.csv",colClasses = "factor", sep = ",", header = TRUE)
+# levelsをそろえる
+all_data <- rbind(train1,test1)
+train1 <- all_data[c(1:80000),]
+test1 <- all_data[c(80001:100000),]
+```
+
+## データを扱う手法によって変形する
+    
+ユーザー情報、アイテム情報、2つの情報を使って予測を行うため必要なデータを抽出する
+
+```{r, include=FALSE}
+# ユーザー情報 
+train1_user = train1[,c(2:5,25)]
+test1_user = test1[,c(2:5,25)]
+# アイテム情報
+train1_item = train1[,c(1,6:25)]
+test1_item = test1[,c(1,6:25)]
+# ユーザー情報 + アイテム情報
+train1_all = train1[,c(-1,-5)]
+test1_all = test1[,c(-1,-5)]
+```
+## check for traing data and test data
+
+### user info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_user,test1_user)
+# TAN
+TANFunc(train1_user, test1_user)
+```
+
+### item info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_item,test1_item)
+# TAN
+TANFunc(train1_item, test1_item)
+```
+
+### user info and item info
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_all,test1_all)
+# TAN
+TANFunc(train1_all, test1_all)
+```
+
+
+age のデータを10歳ごとに分割して調べてみる.
+
+## Cut for age by 10 years
+```{r, include=FALSE}
+train1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_10/train1.csv",colClasses = "factor", sep = ",", header = TRUE)
+test1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_10/test1.csv",colClasses = "factor", sep = ",", header = TRUE)
+# levelsをそろえる
+all_data <- rbind(train1,test1)
+train1 <- all_data[c(1:80000),]
+test1 <- all_data[c(80001:100000),]
+```
+
+## データを扱う手法によって変形する
+    
+ユーザー情報、アイテム情報、2つの情報を使って予測を行うため必要なデータを抽出する
+
+```{r, include=FALSE}
+# ユーザー情報 
+train1_user = train1[,c(2:5,25)]
+test1_user = test1[,c(2:5,25)]
+# アイテム情報
+train1_item = train1[,c(1,6:25)]
+test1_item = test1[,c(1,6:25)]
+# ユーザー情報 + アイテム情報
+train1_all = train1[,c(-1,-5)]
+test1_all = test1[,c(-1,-5)]
+```
+## check for traing data and test data
+
+### user info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_user,test1_user)
+# TAN
+TANFunc(train1_user, test1_user)
+```
+
+### item info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_item,test1_item)
+# TAN
+TANFunc(train1_item, test1_item)
+```
+
+### user info and item info
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_all,test1_all)
+# TAN
+TANFunc(train1_all, test1_all)
+```
+
+# Bayesian network classifier 3
+
+ageとgenderの情報を一つにまとめて新たな変数列を作る
+ageのデータは10歳ごとで分割したデータを使用する
+
+## Cut for age by 10 years
+
+```{r, include=FALSE}
+train1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_10/train1.csv",colClasses = "factor", sep = ",", header = TRUE)
+test1 <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/cut_data_10/test1.csv",colClasses = "factor", sep = ",", header = TRUE)
+# age,genderを結合する
+age.gender <- paste(train1$age,train1$gender,sep = "-") %>% as.factor()
+train1 <- cbind(train1,age.gender)
+age.gender <- paste(test1$age,test1$gender,sep = "-") %>% as.factor()
+test1 <- cbind(test1,age.gender)
+
+# levelsをそろえる
+all_data <- rbind(train1,test1)
+train1 <- all_data[c(1:80000),]
+test1 <- all_data[c(80001:100000),]
+```
+
+
+## データを扱う手法によって変形する
+    
+ユーザー情報、アイテム情報、2つの情報を使って予測を行うため必要なデータを抽出する
+
+```{r, include=FALSE}
+# ユーザー情報 
+train1 %>% 
+  dplyr::select(occupation,item.No,age.gender,rating) -> train1_user
+test1 %>%
+   dplyr::select(occupation,item.No,age.gender,rating) -> test1_user
+# アイテム情報
+train1 %>% 
+  dplyr::select(user.No, unknown, Action, Adventure, Animation, Children, Comedy, Crime, Documentary, Drama, Fantasy, 
+                Film.Noir, Horror, Musical, Mystery, Romance, Sci.Fi, Thriller, War, Western, rating) -> train1_item
+test1 %>% 
+  dplyr::select(user.No, unknown, Action, Adventure, Animation, Children, Comedy, Crime, Documentary, Drama, Fantasy,
+                Film.Noir, Horror, Musical, Mystery, Romance, Sci.Fi, Thriller, War, Western, rating) -> test1_item
+# ユーザー情報 + アイテム情報
+train1 %>% 
+  dplyr::select(occupation,age.gender,unknown,Action,Adventure,Animation,Children,Comedy,Crime, Documentary, Drama, Fantasy,
+                Film.Noir,Horror, Musical, Mystery, Romance, Sci.Fi, Thriller, War, Western, rating) -> train1_all
+test1 %>% 
+  dplyr::select(occupation,age.gender,unknown,Action,Adventure,Animation,Children,Comedy,Crime, Documentary, Drama, Fantasy,
+                Film.Noir,Horror, Musical, Mystery, Romance, Sci.Fi, Thriller, War, Western, rating) -> test1_all
+```
+## check for traing data and test data
+
+### user info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_user,test1_user)
+# TAN
+TANFunc(train1_user, test1_user)
+```
+
+### item info only
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_item,test1_item)
+# TAN
+TANFunc(train1_item, test1_item)
+```
+
+### user info and item info
+
+```{r}
+# naive bayes
+NaiveBayesFunc(train1_all,test1_all)
+# TAN
+TANFunc(train1_all, test1_all)
+```
+
+

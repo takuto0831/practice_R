@@ -1,0 +1,275 @@
+---
+title: "Some Algorithm Recommend System"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# package install
+
+```{r,message=FALSE}
+library(e1071)
+library(bnlearn)
+library(dplyr)
+library(mlr)
+library(foreach)
+library(xgboost)
+```
+
+# 比較データとして異なる手法を調べる
+
+```{r, include=FALSE}
+train <- read.csv("C:/Users/Rstudio/Desktop/vasily_test/csv/train1.csv", sep = ",", header = TRUE)
+test <- read.table("C:/Users/Rstudio/Desktop/vasily_test/csv/test1.csv", sep = ",", header = TRUE)
+all_data <- rbind(train,test)
+train <- all_data[c(1:80000),]
+test <- all_data[c(80001:100000),]
+```
+
+```{r, include=FALSE}
+# 必要なデータを抽出する
+train %>% 
+  dplyr::select(age,gender,occupation,item.No,rating) -> train
+test %>% 
+  dplyr::select(age,gender,occupation,item.No,rating) -> test
+```
+
+## SVM
+
+```{r, eval=FALSE}
+model_svm <- ksvm(rating ~ age + gender + occupation + item.No, data = train)
+pred_svm <- predict(model_svm, train)
+tab_svm <- table(train$rating,pred_svm)
+sum(diag(tab_svm)) / sum(tab_svm)
+```
+
+## dicision tree algorithm
+
+# 予測がすべて４になっているからダメ
+
+```{r, message=FALSE}
+cart_func <- function(){
+  #分類したいタスクの定義
+  task <- makeClassifTask(id = "movie_task",data = train, target = "rating")
+  test_ <- makeClassifTask(id = "movie_task",data = test, target = "rating")
+  
+  #学習器の定義
+  tune.learner <- makeLearner(cl = "classif.rpart")
+
+  #5-分割交差検証の実行
+  resampling <- makeResampleDesc(method =  "CV", iters = 5L)
+
+  #グリッドサーチの実行の設定
+  control.grid <- makeTuneControlGrid()
+
+  #グリッドサーチのパラメータ空間 
+  param.set <- makeParamSet(
+    makeDiscreteParam("cp", values = c(0.1, 0.01)),
+    makeDiscreteParam("maxdepth", values = c(3, 4)) 
+  )
+
+  #5分割交差検証における評価尺度として正解率(acc)
+  measures <- list(acc)
+
+  #グリッドサーチによるパラメータサーチ
+  tune.result  <- tuneParams(learner = tune.learner,
+                           task = task,
+                           resampling = resampling,
+                           control = control.grid,
+                           par.set = param.set,
+                           measures = measures)
+                          
+  #最適なパラメータでモデル構築
+  train.learner <- makeLearner(cl = "classif.rpart",
+                               cp = tune.result$x$cp,
+                               maxdepth = tune.result$x$maxdepth)
+
+  model <- train(learner = train.learner, task = task)
+
+  #検証データに対して予測する
+  task.pred <- predict(model, test_)
+
+  #決定木によるパフォーマンス
+  performance(task.pred, measures = measures)
+  
+  # MSE
+  mean((as.integer(task.pred$data$truth)- as.integer(task.pred$data$response))^2)
+}
+```
+
+### 実行結果
+
+```{r,message=FALSE}
+(result_tree <- cart_func())
+```
+
+## random forest
+```{r, message=FALSE}
+forest_func <- function(){
+  #分類したいタスクの定義
+  task <- makeClassifTask(id = "movie_task",data = train, target = "rating")
+  test_ <- makeClassifTask(id = "movie_task",data = test, target = "rating")
+  
+  #学習器の定義
+  tune.learner <- makeLearner(cl = "classif.randomForest")
+
+  #5-分割交差検証の実行
+  resampling <- makeResampleDesc(method =  "CV", iters = 5L)
+
+  #グリッドサーチの実行の設定
+  control.grid <- makeTuneControlGrid()
+
+  #グリッドサーチのパラメータ空間 
+  param.set <- makeParamSet(
+    makeIntegerParam("ntree", lower = 499L, upper = 500L)
+  )
+
+  #5分割交差検証における評価尺度として正解率(acc)
+  measures <- list(acc)
+
+  #グリッドサーチによるパラメータサーチ
+  tune.result  <- tuneParams(learner = tune.learner,
+                           task = task,
+                           resampling = resampling,
+                           control = control.grid,
+                           par.set = param.set,
+                           measures = measures)
+                          
+  #最適なパラメータでモデル構築
+  train.learner <- makeLearner(cl = "classif.randomForest",
+                               par.vals = tune.result$x)
+
+  model <- train(learner = train.learner, task = task)
+
+  #検証データに対して予測する
+  task.pred <- predict(model, test_)
+  
+  # MSE
+  mean((as.integer(task.pred$data$truth)- as.integer(task.pred$data$response))^2)
+}
+```
+
+### 実行結果
+
+```{r,message=FALSE}
+(result_forest <- forest_func())
+```
+
+
+## naive Bayes
+
+```{r, message=FALSE}
+nb_func <- function(){
+  #分類したいタスクの定義
+  task <- makeClassifTask(id = "movie_task",data = train, target = "rating")
+  test_ <- makeClassifTask(id = "movie_task",data = test, target = "rating")
+
+  #正解率(acc)
+  measures <- list(acc)
+
+  model <- train(learner = "classif.naiveBayes", task = task)
+
+  #検証データに対して予測する
+  task.pred <- predict(model,task = test_)
+  
+  #naiveBayesによるパフォーマンス
+  performance(task.pred, measures = measures)
+  
+  #MSE
+  mean((as.integer(task.pred$data$truth)- as.integer(task.pred$data$response))^2)
+}
+```
+
+### 実行結果
+
+```{r}
+(result_nb <- nb_func())
+```
+
+## xgboost
+
+```{r, include=FALSE}
+# 適応する型に変換する関数
+Form_num <- function(data){
+  for(i in 1:(dim(data)[2] - 1)){
+    data[,i] <- as.numeric(data[,i])
+  }
+  data[,dim(data)[2]] <- as.factor(data[,dim(data)[2]])
+  return(data)
+}
+```
+
+```{r, include=FALSE}
+# 型変換
+train %>% 
+  Form_num() -> train_
+test %>% 
+  Form_num() -> test_
+```
+
+```{r, message=FALSE}
+xgboost_func <- function(){
+  #分類したいタスクの定義
+  task <- makeClassifTask(id = "movie_task",data = train_, target = "rating")
+  test <- makeClassifTask(id = "movie_task",data = test_, target = "rating")
+  
+  #学習器の定義
+  tune.learner <- makeLearner(cl = "classif.xgboost")
+
+  tune.learner$par.vals <- list(objective = "multi:softmax",
+                                eval_metric = "mlogloss",
+                                num_class = 5,
+                                silent = 0)
+  #5-分割交差検証の実行
+  resampling <- makeResampleDesc(method =  "CV", iters = 5L)
+
+  #グリッドサーチの実行の設定
+  control.grid <- makeTuneControlGrid()
+
+  #グリッドサーチのパラメータ空間 
+  param.set <- makeParamSet(
+    makeIntegerParam("nrounds",lower=400,upper=600),
+    makeIntegerParam("max_depth",lower=3,upper=20),
+    makeNumericParam("lambda",lower=0.55,upper=0.60),
+    makeNumericParam("eta", lower = 0.01, upper = 0.5),
+    makeNumericParam("subsample", lower = 0.10, upper = 0.80),
+    makeNumericParam("min_child_weight",lower=1,upper=5),
+    makeNumericParam("colsample_bytree",lower = 0.2,upper = 0.8)
+  )
+
+  #正解率(acc)
+  measures <- list(acc)
+  
+  #グリッドサーチによるパラメータサーチ
+  tune.result  <- tuneParams(learner = tune.learner,
+                             task = task,
+                             resampling = resampling,
+                             control = control.grid,
+                             par.set = param.set,
+                             measures = measures)
+                          
+
+  #最適なパラメータでモデル構築
+  train.learner <- makeLearner(cl = "classif.xgboost",
+                               par.vals = tune.result$x)
+
+  model <- train(learner = train.learner,task = task)
+
+  #検証データに対して予測する
+  task.pred <- predict(model,task = test)
+  
+  #xgboostによるパフォーマンス
+  performance(task.pred, measures = measures)
+}
+```
+
+### 実行結果
+
+```{r}
+(result_xgb <- xgboost_func())
+```
