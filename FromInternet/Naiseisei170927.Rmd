@@ -1,0 +1,526 @@
+---
+title: "計算メモ：内生性（交絡）があるときの説明変数と誤差と残差の相関を見る"
+output: html_document
+---
+
+内生性の一般的な定義は「説明変数と誤差項に相関がある」である（例えば→[Wikipedia](https://ja.wikipedia.org/wiki/%E5%86%85%E7%94%9F%E6%80%A7)）。この定義を即答できる人は多いと思われる。一方、微妙に角度をズラした問いとして『内生性があるとき、説明変数と「（回帰分析の）残差」は相関するか？』という問いに自信をもって即答できる人は意外と少ないのではないか、というような気がしないでもない。
+
+この計算メモでは、いわゆる「内生性」があるときの回帰係数や残差や誤差がどうなるかを実際に計算する。それらの計算結果を眺めることにより、「内生性」についてのある種の感覚がつかめれば御の字である。
+
+## 0. 用いるデータの準備（n=1000）
+### 0.1 用いるデータを作成する
+サンプルサイズはn=1000, 変数X, A, B, C, D, Eを想定する
+```{r DataCompilation, warning=FALSE, message=FALSE}
+# 例示のため乱数の種を指定する
+# 単に乱数をとりたい場合には以下の行をコメントアウトすること
+set.seed(101)
+
+# サンプルサイズはn, 変数はX, A, B, C, D, E
+n <- 100000
+X <- (rnorm(n, mean=25, sd=15))
+A <- (rnorm(n, mean=50, sd=0))
+B <- (rnorm(n, mean=15, sd=5))
+C <- (rnorm(n, mean=5, sd=2))
+D <- (rnorm(n, mean=5, sd=1))
+E <- (rnorm(n, mean=5, sd=1))
+```
+
+### 0.2 Yを決定論的に生成する
+Yの値はX, A, B, C, Dの関数として式1「Y ＝ X + A + 2B + C + D」で決定論的に定まる。この式1は本来は"神のみぞ知る"ようなYの生成メカニズムを表すとする。ここで「X→Yの介入効果（＝Xを1単位増加させたときのYの増加量）」は与式から"1"となる。
+```{r GenerationY, warning=FALSE, message=FALSE}
+Y <- 1*X + 1*A + 2*B + 1*C + 1*D
+```
+
+### 0.3 用いるデータの中身を確認する
+イメージを掴むため、Y, X, A, B, C, Dの数値（最初の10個のデータ）と統計量を以下に示す：
+```{r PlottingData, warning=FALSE, message=FALSE}
+# データをデータフレームに格納
+data1 <- data.frame(Y, X, A, B, C, D, E)
+# 最初の15個のデータを表示する
+head(data1,10)
+# 各変数の平均
+apply(data1,2,mean)
+# 各変数の分散
+apply(data1,2,var)
+```
+
+### 0.4 用いるデータの相関行列をみる
+Y, X, A, B, C, Dの相関行列は以下の通り。Aはサンプル内で常にA=50であり分散を持たない。式1から当然に予想されるとおりYとX, A, B, C, Dの間には相関が見られる。一方、（0.1節でのコードから予想されるとおり）XとA, B, C, D, Eは相関を持たない。
+```{r PlottingCorrmat, warning=FALSE, message=FALSE, fig.width=5, fig.height=5}
+# 相関行列のプロット
+require("PerformanceAnalytics")
+#chart.Correlation(data1, col=rgb(0, 0, 1, alpha=0.1))
+#require("psych")
+#pairs.panels(data1,rug=F,ellipses=F,lm=F, col=rgb(0, 0, 1, alpha=0.1))
+
+# 以下以下のコードは
+# http://statmodeling.hatenablog.com/entry/scatter-plot-matrix
+# を参考に本解析用に改変した。多謝。
+
+pairs.mod <- function(d) { 
+
+  panel.hist <- function(x, ...) {
+    usr <- par('usr'); on.exit(par(usr))
+    par(usr=c(usr[1:2], 0, 1.5))
+    h <- hist(x, plot=FALSE)
+    breaks <- h$breaks
+    nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col='gray', ...)
+    }
+
+  panel.cor <- function(x, y, ...){
+    usr <- par('usr'); on.exit(par(usr))
+    par(usr=c(0,1,0,1))
+    r <- cor(x, y, method='spearman', use='pairwise.complete.obs')
+    text(x=.5, y=.5, lab=round(r, 2), cex=2, col='orange2')
+    }
+
+  panel.scatter <- function(x, y){
+    points(x, y, col=rgb(0, 0, 0.8, alpha=0.05) , cex=1)
+    lines(lowess(x, y))
+    }
+
+  pairs(d,
+        diag.panel=panel.hist,
+        lower.panel=panel.scatter,
+        upper.panel=panel.cor,
+        gap=0.5,
+        labels=gsub('\\.', '\n', colnames(d)),
+        label.pos=0.85,
+        cex.labels=1.5
+        )
+}
+pairs.mod(data1)
+```
+
+# bn追加
+
+
+
+```{r}
+library(dplyr)
+library(bnlearn)
+library(forecast)
+library(ggplot2)
+```
+
+```{r}
+data1 <- gaussian.test
+train1 <- data1[c(1:4000),]
+test1 <- data1[c(4001:5000),]
+test1$G <- 0
+bn <- hc(train1)
+fit <- bn.fit(bn, train1)
+pred <- predict(fit,"G",test1)
+accuracy(f = pred, x = test1[, "G"]) 
+
+#予測結果の可視化
+df <- data.frame(prediction=pred,actual=test1[, "G"])
+p <- ggplot(df,aes(x = prediction,y = actual)) + geom_point() 
+p <- p + geom_line(data = data.frame(x = c(0,100), y = c(0,100)),aes(x = x, y = y), colour = "red")
+p
+```
+
+## 1. 内生性がない場合：回帰と残差と誤差の関係をみる
+### 1.0 YをXで回帰してみる
+ふつうにYをXで回帰してみよう：
+```{r Regression1, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+require(ggplot2)
+gp <- ggplot(data1, aes(x=X, y=Y))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+回帰分析の結果の要約は以下の通り。Xの回帰係数（"Estimate"）の正解は式1より「1」であるが、n=1000とサンプルサイズも十分にあるので「1.00607」と高い精度で推定されている。R2乗は0.65である。
+```{r InsideRegression1}
+lm.res <- lm(Y ~ X)
+summary(lm.res)
+```
+
+### 1.1 残差と誤差を計算してみる
+まず「回帰分析の残差」を計算する。以下では残差は「Yの値」と「得られた回帰モデルによるYの予測値」の差分であることが分かるように計算している。
+```{r InsideRegression2, fig.width=2.5, fig.height=2.5}
+# 残差の計算
+Y_predict <- predict(lm.res, X = X)
+Y_residual <- Y - Y_predict
+
+data1_1a <- data.frame(Y_residual)
+
+gp <- ggplot(data1_1a, aes(x = Y_residual), colour = "blue")
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp
+```
+
+一方、通常は「回帰分析の誤差」そのものは算出できない（母集団のパラメータなので）。しかし今回はチート的状況として「真のメカニズムモデル」が式1として既知であるので、式1から「YのうちXでは決まらない部分」を、「誤差」とみなして「Error = Y - 1×X = 1×A + 2×B + 1×C + 1×D」として算出する。（＊この「誤差」の定義はちょっともやもやするかもしれませんが、この場の説明用の便宜的なものとしてご容赦ください）
+```{r InsideRegression2_1, fig.width=2.5, fig.height=2.5}
+# 誤差の計算（"神のみぞ知る"式1より計算）
+Y_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+
+data1_1b <- data.frame(Y_error_byEq1)
+
+gp <- ggplot(data1_1b, aes(x = Y_error_byEq1), colour = "blue")
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp
+```
+
+イメージを掴むため、Y, X, Yの予測値, 残差, 誤差を表として以下に示す（最初の15データ）：
+```{r InsideRegression3}
+data2 <- data.frame(Y, X, Y_predict, Y_residual, Y_error_byEq1)
+head(data2, 15)
+```
+
+### 1.2 残差と誤差を比較してみる
+ここで残差（ピンク）と誤差（水色）のヒストグラムは以下のようになる。形状はほぼ一致しているが、平均はズレている。
+```{r InsideRegression4, fig.width=5, fig.height=3}
+require(reshape2)
+data3 <- melt(data2, measure.vars = c("Y_residual","Y_error_byEq1"))
+
+gp <- ggplot(data3, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+```
+
+上記で両者分布がズレている理由は、回帰分析の中では「X以外の要因からの影響」のうち平均に関する影響は定数項（切片）として切り分けて扱われるためである。上記の誤差について「誤差 - 回帰モデルの切片の値」として定数項分の補正を行うと、両者の分布は以下のようにほぼ一致する：
+```{r InsideRegression5, fig.width=5, fig.height=3}
+data4 <- data.frame(Y, X, Y_predict, Y_residual, Y_error_adjust = Y_error_byEq1 - lm.res$coefficients[1])
+data4 <- melt(data4, measure.vars = c("Y_residual","Y_error_adjust"))
+
+gp <- ggplot(data4, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+```
+
+### 1.3 残差と誤差はXと相関するか？
+
+Xと「誤差」のプロットは以下の通り。相関はない。
+```{r InsideRegression7, fig.width=3, fig.height=3}
+#plot(Y_error_byEq1 ~ X, col = "#0000ff75")
+gp <- ggplot(data1, aes(x=X, y=Y_residual))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(50-(50+175)/2,175-(50+175)/2)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+Xと「残差」のプロットは以下の通り。相関はない。
+```{r InsideRegression6, fig.width=3, fig.height=3}
+#plot(Y_residual ~ X, col = "#ff00ff75")
+gp <- ggplot(data1, aes(x=X, y=Y_error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(50,175)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+両者のプロットプロットを重ねてみよう。
+```{r InsideRegression8, fig.width=3, fig.height=3}
+#plot(Y_residual ~ X, col = "#ff00ff75")
+gp <- ggplot(data1, aes(x=X, y=Y_error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(50,175)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+
+さて。上記では内生性のない場合を見てきた。内生性のある場合、「残差」はXと相関するだろうか？
+
+## 2.内生性あり：回帰と残差と誤差の関係はどうなる？
+
+### 2.1 用いるデータを作成する
+先ほどのデータとほぼ同じだが、XがBとEの関数として式2「X <- 1×B + 2×E」により決定論的に定まる点だけ異なるデータを作成する。上述の例との表記上の区別のため、以下のコードではXとYを「X2」「Y2」と表記する。
+```{r Naiseisei2_1}
+X2 <- 1*B + 2*E
+```
+
+Yを生成する式は今までの例と同一の式1である。大事なことなので繰り返すが、Yを生成する式は今までと同一の式1である。与式よりX→Yの介入効果は「1」である。
+```{r Naiseisei2_1b}
+Y2 <- 1*X2 + 1*A + 2*B + 1*C + 1*D
+```
+
+イメージを掴むため、最初の15データを以下に示す：
+```{r Naiseisei2_1c}
+data2 <- data.frame(Y2, X2, A, B, C, D,E)
+head(data2,15)
+```
+
+相関行列は以下の通りとなる。この例ではX2はBとEの関数であるため、X2とB, Eの間には相関がみられる。
+```{r Naiseisei2_1d, warning=FALSE, message=FALSE, fig.width=5, fig.height=5}
+#chart.Correlation(data2, col=rgb(0, 0, 1, alpha=0.1))
+pairs.mod(data2)
+```
+
+### 2.2 YをXで回帰してみる
+1節の例と同様に、ふつうにYをXで回帰してみる：
+```{r naiseisei2_2, fig.width=3, fig.height=3}
+#plot(Y_residual ~ X, col = "#ff00ff75")
+gp <- ggplot(data2, aes(x=X2, y=Y2))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+#plot(Y2 ~ X2, col = rgb(0, 0, 1, alpha=0.5))
+#abline(lm.res2 , lwd=1 , col="red")
+```
+
+回帰分析の結果の要約は以下の通り。R2乗は0.92であり、一般論として適合したモデルはデータにおけるバラツキをかなり良く説明していると言える。しかしながら、「Xの介入効果」は式1より「1」であるにもかかわらず、得られたXの回帰係数（"Estimate"）は「2.74」とその本当の介入効果から2.7倍もかさ増しされた数値になっている（ちなみに回帰係数の推定値の標準誤差自体は0.025と非常に小さく数値上の推定精度は高い）。このように、回帰モデル全体としての適合が良好であることと、その回帰モデルが介入効果の適切な推定値をもたらすことは本質的に別の問題である。げに恐ろしきは内生性である。
+```{r naiseisei2_2b}
+lm.res2 <- lm(Y2 ~ X2)
+summary(lm.res2)
+```
+
+### 2.3 回帰分析の「残差」と「誤差」はXと相関するのか？
+
+さて。このケースで「残差」と「誤差」はXと相関するだろうか？ まず、Xと「残差」のプロットを以下に示す：
+```{r naiseisei2_3, fig.width=3, fig.height=3}
+Y2_residual <- residuals(lm.res2)
+gp <- ggplot(data1, aes(x=X2, y=Y2_residual))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(60 - (60+170)/2,170 - (60+170)/2)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+#plot(Y2_residual ~ X2, col = "#ff00ff75")
+```
+
+Xと「回帰分析の残差」には相関が見られない。一方、Xと「誤差」のプロットには以下の綺麗な相関を見ることができる。ここで相関が生じる理由は、Xも「誤差」もBの関数であるためである。このように、説明変数と誤差が同じ要因（この例ではB）により影響を受けるとき（DAG的にいうとXとYの間のバックドアパスが閉じていないとき）に両者の間には相関が生じる。
+```{r naiseisei2_4, fig.width=3, fig.height=3}
+Y2_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+#plot(Y2_error_byEq1 ~ X2, col = "#0000ff75")
+gp <- ggplot(data1, aes(x=X2, y=Y2_error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(50,170)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+内生性、かくにん！
+
+### 2.4 内生性があるときの「残差」と「誤差」のズレを見る
+
+内生性がない場合には「残差」と「誤差」の分布はほぼ重なっていた。今回の内生性がある場合においては、回帰分析の残差（ピンク）と式1から求めた誤差（水色）の分布は以下のように異なっている：
+```{r naiseisei2_5, fig.width=5, fig.height=3}
+#hist(Y2_residual, col = "#ff00ff20", border = "#ff00ff", breaks = 30, xlim = c(-50, 150), ylim = c(0,100), main="")
+#hist(Y2_error_byEq1, col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+
+#data5 <- data.frame(Y2, X2, Y2_predict, Y2_residual, Y2_error_adjust = Y2_error_byEq1 - lm.res2$coefficients[1])
+data5 <- data.frame(Y2, X2, Y2_residual, Y2_error_byEq1)
+data5 <- melt(data5, measure.vars = c("Y2_residual","Y2_error_byEq1"))
+
+gp <- ggplot(data5, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+```
+
+内生性がある場合には、上記の誤差について「誤差 - 回帰モデルの切片の値」として定数項分の補正を行っても、残差と誤差の分布は重ならない。分散に着目すると、残差（ピンク）の分布のほうが分散が小さくなっている。これは、XがYをいわば「過剰説明」しているためである。XがBの成分を含んでおり、式1のメカニズムから示されるよりも、適合した回帰モデルにおけるXの説明力が（介入効果推定の観点からは）過大になっているためである。また、本来はBの平均値に由来する部分についてもXの値によって「説明」されているため、回帰モデルの定数項分の補正を行っても分布は重ならない。
+```{r naiseisei2_6, fig.width=5, fig.height=3}
+#hist(Y2_residual, col = "#ff00ff20", border = "#ff00ff", breaks = 30, xlim = c(-50, 150), ylim = c(0,100), main="")
+#hist(Y2_error_byEq1 - lm.res2$coefficients[1], col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+
+#data5 <- data.frame(Y2, X2, Y2_predict, Y2_residual, Y2_error_adjust = Y2_error_byEq1 - lm.res2$coefficients[1])
+data6 <- data.frame(Y2, X2, Y2_residual, Y2_error_adjust = Y2_error_byEq1 - lm.res2$coefficients[1])
+data6 <- melt(data6, measure.vars = c("Y2_residual","Y2_error_adjust"))
+
+gp <- ggplot(data6, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+```
+
+これはつまり、内生性がないときには残差は「真の誤差（モデル内の説明変数以外による影響の総体）」を反映していると期待できるが、内生性があるときには残差と「真の誤差（モデル内の説明変数以外による影響の総体」はズレているということである。
+
+### 2.5 YをXとBで重回帰してみる
+この例では内生性の原因となっている交絡要因はBである。交絡を調整するためにBをモデルに加えて、YをXとBで重回帰してみよう：
+```{r naiseisei2_7}
+lm.res2_5 <- lm(Y2 ~ X2 + B)
+summary(lm.res2_5)
+```
+こんどのXの偏回帰係数は「0.96」であり、式1のメカニズムによる真の介入効果である「1」の良い推定となっている。
+
+本モデルにおいては誤差（ここでは誤差は「Y-X-2B」で定義される）とXの相関も消えているはずである。
+```{r naiseisei2_8, fig.width=3, fig.height=3}
+Y2_5error_byEq1 <- 1*A + 1*C + 1*D
+#plot(Y2_5error_byEq1 ~ X2, col = "#0000ff75")
+gp <- ggplot(data1, aes(x=X2, y=Y2_5error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(30,90)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+実際に、Xと「誤差（XとB以外による影響の総体）」のプロットからは相関が消えていることが確認できる。
+
+## 3. 内生変数だけど内生性なし
+
+XがEの関数であるが、Bの関数ではない場合を考える。このときXはシステム／構造方程式の内部で決定されるので「内生変数」と呼ばれる（と認識してるけど、この辺りの計量経済系の用語法はあんまり自信ないです）。この例では記述の都合上、コード内ではXとYをそれぞれ「X3」「Y3」と記述する。
+```{r naiseisei3_1}
+X3 <- 10*E
+```
+
+Yを生成する式は今までの例と同一の式1である。大事なことなのでまた繰り返すが、Yを生成する式は今までと同一の式1である。与式よりX→Yの介入効果は「1」である。
+```{r naiseisei3_2}
+Y3 <- 1*X3 + 1*A + 2*B + 1*C + 1*D
+```
+
+今までと同様にXでYを単回帰する：
+```{r naiseisei3_3, fig.width=3, fig.height=3}
+#plot(Y3 ~ X3, col = rgb(0, 0, 1, alpha=0.5))
+#abline(lm.res3 , lwd=1 , col="red")
+data3 <- data.frame(Y3, X3, A, B, C, D, E)
+gp <- ggplot(data3, aes(x=X3, y=Y3))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+回帰分析の結果の要約は以下の通り。Xの回帰係数（"Estimate"）の正解は式1より「1」であるが、n=1000とサンプルサイズも十分にあるので「1.00638」と高い精度で推定されている。つまり、Xは内生変数であるがバイアスは生じていない。R2乗は0.47である。
+```{r naiseisei3_4}
+lm.res3 <- lm(Y3 ~ X3)
+summary(lm.res3)
+```
+
+Xと残差のプロット、Xと「誤差」のプロットは以下の通り。いずれも相関はない。つまりXは内生変数であるが、Xによる単回帰モデルでも内生性は生じていない。（内生性が生じるかどうかを考える上で重要なのは、「Xが内生変数である」こと自体ではなく、「X」と「誤差」のそれぞれを関数として捉えたときに、それらの関数の構成要素として含まれる変数の集合に重複する部分があるかどうかである／DAG的にいうとバックドアパスが開いているかどうか）
+```{r naiseisei3_5, fig.width=3, fig.height=3}
+Y3_residual <- residuals(lm.res3)
+#plot(Y3_residual ~ X3, col = "#ff00ff75")
+Y3_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+#plot(Y3_error_byEq1 ~ X3, col = "#0000ff75")
+data3_5 <- data.frame(X3, Y3_residual, Y3_error_byEq1)
+
+gp <- ggplot(data3_5, aes(x=X3, y=Y3_residual))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(-50,50)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+
+gp <- ggplot(data3_5, aes(x=X3, y=Y3_error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + ylim(40,140)
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+最初の例と同様に、残差と「誤差」の分布を見ると以下のようになる。切片の分を補正すると両者は良く整合する。
+```{r naiseisei3_6, fig.width=5, fig.height=3}
+#hist(Y3_residual, col = "#ff00ff20", border = "#ff00ff", breaks = 30, xlim = c(-50, 150), ylim = c(0,100), main="")
+#hist(Y3_error_byEq1, col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+
+#hist(Y3_residual, col = "#ff00ff20", border = "#ff00ff", breaks = 30, xlim = c(-50, 150), ylim = c(0,100), main="")
+#hist(Y3_error_byEq1 - lm.res3$coefficients[1], col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+
+data3_6 <- data.frame(Y3_residual, Y3_error_byEq1, Y3_error_adjust = Y3_error_byEq1 - lm.res3$coefficients[1])
+data3_6a <- melt(data3_6, measure.vars = c("Y3_residual","Y3_error_byEq1"))
+data3_6b <- melt(data3_6, measure.vars = c("Y3_residual","Y3_error_adjust"))
+
+gp <- ggplot(data3_6a, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+
+gp <- ggplot(data3_6b, aes(x = value, fill = variable))
+gp <- gp + geom_histogram(alpha = 0.5, position = "identity", binwidth=2)
+gp <- gp + labs(colour="Group")
+gp
+```
+
+## 4. おまけ1：説明変数と残差に相関があるってどんなときよ？
+
+おまけとして、説明変数と「残差」に相関がある場合を見てみましょう。以下では、YがXではなくX*Xに比例する場合に、Y=Xを回帰分析してみます。当然、回帰直線（赤色）はデータ（青色）とズレてきます。
+```{r naiseisei4_1, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+Y <- 1*X*X + 1*A + 2*B + 1*C + 1*D
+data4_1 <- data.frame(Y, X, A, B, C, D)
+#plot(Y ~ X, col = rgb(0, 0, 1, alpha=0.5))
+lm.res4 <- lm(Y ~ X)
+#abline(lm.res4 , lwd=1 , col="red")
+gp <- ggplot(data4_1, aes(x=X, y=Y))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+このとき、残差はXに従って系統的にズレてきます。これは説明変数と「残差」に相関がある（互いに非独立である）状況と言えます。
+```{r naiseisei4_2, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+Y4_residual <- residuals(lm.res4)
+data4_2 <- data.frame(Y, X, A, B, C, D, Y4_residual)
+#plot(Y4_residual ~ X, col = "#ff00ff75")
+gp <- ggplot(data4_2, aes(x=X, y=Y4_residual))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+#gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+つまり、回帰モデル自体が適切でない（データの傾向をうまくcaptureできていない）ときに、説明変数と残差に相関が生じることになります。
+
+一方、Xと「誤差」が共通の成分を含んでいるわけではないので、説明変数と「誤差」には相関はありません。
+```{r naiseisei4_3, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+Y4_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+#plot(Y4_error_byEq1 ~ X, col = "#0000ff75")
+data4_3 <- data.frame(Y, X, A, B, C, D, Y4_error_byEq1)
+#plot(Y4_residual ~ X, col = "#ff00ff75")
+gp <- ggplot(data4_2, aes(x=X, y=Y4_error_byEq1))
+gp <- gp + geom_point(size=1, alpha=0.5, col = rgb(0, 0, 1))
+#gp <- gp + stat_smooth(method = "lm", se = FALSE, colour = "black", size = 1)
+gp
+```
+
+## 5. おまけ2：共変量のバランシングとの関係について
+力尽きたので割愛
+```{r naiseisei5_1, warning=FALSE, message=FALSE, fig.width=5, fig.height=5}
+# X5 <- cut(X,breaks=c(-1000,median(X),1000), labels=c(0,1))
+# X5 <- as.integer(X5) - 1
+# X5
+# Y <- 25*X5 + 1*A + 2*B + 1*C + 1*D
+# plot(Y ~ X5, col = rgb(0, 0, 1, alpha=0.5), ylim=c(min(Y),max(Y)))
+# lm.res5 <- lm(Y ~ X5)
+# abline(lm.res5 , lwd=1 , col="red")
+# summary(lm.res5)
+# 
+# Y5_residual <- residuals(lm.res5)
+# plot(Y5_residual ~ X5, col = "#ff00ff75")
+# Y5_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+# plot(Y5_error_byEq1 ~ X5, col = "#0000ff75")
+# ```
+# 
+# ```{r naiseisei5_2, warning=FALSE, message=FALSE}
+# X6 <- cut(X2,breaks=c(-1000,median(X2),1000), labels=c(0,1))
+# X6 <- as.integer(X6) - 1
+# X6
+# Y <- 25*X6 + 1*A + 2*B + 1*C + 1*D
+# plot(Y ~ X6, col = rgb(0, 0, 1, alpha=0.5), ylim=c(min(Y),max(Y)))
+# lm.res6 <- lm(Y ~ X6)
+# abline(lm.res6 , lwd=1 , col="red")
+# summary(lm.res6)
+# 
+# Y6_residual <- residuals(lm.res6)
+# plot(Y6_residual ~ X6, col = "#ff00ff75")
+# Y6_error_byEq1 <- 1*A + 2*B + 1*C + 1*D
+# plot(Y6_error_byEq1 ~ X6, col = "#0000ff75")
+# 
+# temp.df <- data.frame(X6, A, B, C, D)
+# AX0 <- subset(temp.df, X6 == 0, A)
+# AX1 <- subset(temp.df, X6 == 1, A)
+# 
+# BX0 <- subset(temp.df, X6 == 0, B)
+# BX1 <- subset(temp.df, X6 == 1, B)
+# 
+# CX0 <- subset(temp.df, X6 == 0, C)
+# CX1 <- subset(temp.df, X6 == 1, C)
+# 
+# DX0 <- subset(temp.df, X6 == 0, D)
+# DX1 <- subset(temp.df, X6 == 1, D)
+# 
+# #hist(AX0$A, col = "#ff00ff20", border = "#ff00ff", breaks = 1)
+# #hist(AX1$A, col = "#0000ff20", border = "#0000ff", breaks = 1, add = TRUE)
+# 
+# hist(BX0$B, col = "#ff00ff20", border = "#ff00ff", breaks = 30, xlim = c(-5,40), ylim =c(0,100))
+# hist(BX1$B, col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+# 
+# hist(CX0$C, col = "#ff00ff20", border = "#ff00ff", breaks = 30)
+# hist(CX1$C, col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+# 
+# hist(DX0$D, col = "#ff00ff20", border = "#ff00ff", breaks = 30)
+# hist(DX1$D, col = "#0000ff20", border = "#0000ff", breaks = 30, add = TRUE)
+```
