@@ -1,0 +1,59 @@
+---
+title: "bnlearn"
+author: "takuto kotsubo"
+date: "2017年9月27日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(bnlearn)
+```
+
+```{r}
+data("asia")
+```
+
+```{r}
+head(asia)
+str(asia)
+```
+
+asia dataset について
+
+- D:呼吸困難
+- T:結核
+- L:肺がん
+- B:気管支炎
+- A:アジア訪問
+- S:喫煙
+- X:胸部エックス線
+- E:T or L にかかったことがあるか
+
+```{r}
+nb <- gs(asia)
+fit_gs <- bn.fit(nb,asia)
+plot(nb)
+```
+
+```{r}
+nb <- hc(asia)
+fit_hc <- bn.fit(nb,asia)
+plot(nb)
+```
+
+
+
+
+
+
+
+
+
+
+
