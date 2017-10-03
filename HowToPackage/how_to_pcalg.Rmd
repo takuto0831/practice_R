@@ -1,0 +1,89 @@
+---
+title: "LiNGAM"
+author: "takuto kotsubo"
+date: "2017年10月3日"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls(all=TRUE))
+```
+
+## R Markdown
+
+```{r, message=FALSE}
+# パッケージがない場合
+#install.packages("pcalg")
+#source("https://bioconductor.org/biocLite.R")
+#biocLite("RBGL")
+library(igraph)
+library(RBGL)
+library(pcalg)
+```
+
+## LiNGAMの実行例を示す
+
+LiNGAM : Linear non-Gaussian ACyclic Models
+
+Bpruned : $p \times p$ 行列 $B_{i,j}$ 成分は$j \rightarrow i$のエッジについて表す
+
+stde :予測誤差の逸脱度
+
+ci   :切片項or定数項
+
+```{r,eps1}
+set.seed(4414)
+n <- 500
+# 外生要因
+eps1 <- sign((rnorm(n))) * sqrt(abs(rnorm(n))) #sign:符号関数
+eps2 <- runif(n) - 0.5
+# x2をもとにx1を決定する
+x2 <- 3 + eps2
+x1 <- 0.9 * x2 + 7 + eps1
+
+trueDAG <- cbind(c(0,1),c(0,0))
+
+X <- cbind(x1,x2) 
+res <- lingam(X)
+
+show(trueDAG) # True DAG　
+
+# True DAGの方式に合わせる
+as(res, "amat") # Estimate DAG
+
+show(c(7,3)) #True 
+show(res$ci) #Estimate
+```
+
+```{r,eps2}
+set.seed(4414)
+n <- 500 
+eps1 <- sign(rnorm(n)) * sqrt(abs(rnorm(n))) 
+eps2 <- runif(n) - 0.5 
+eps3 <- sign(rnorm(n)) * abs(rnorm(n))^(1/3) 
+eps4 <- rnorm(n)^2
+
+x2 <- eps2 
+x1 <- 0.9*x2 + eps1 
+x3 <- 0.8*x2 + eps3 
+x4 <- -x1 -0.9*x3 + eps4
+
+X <- cbind(x1,x2,x3,x4)
+#真の隣接行列
+trueDAG <- cbind(x1 = c(0,1,0,0), 
+                 x2 = c(0,0,0,0), 
+                 x3 = c(0,1,0,0), 
+                 x4 = c(1,0,1,0))
+
+res1 <- lingam(X, verbose = TRUE)# details on LINGAM 
+res2 <- lingam(X, verbose = 2) # details on LINGAM and fastICA 
+
+#############################
+stopifnot(identical(res1, res2)) 
+
+show(trueDAG) # True DAG
+as(res1, "amat") # Estimate DAG
+```
+
