@@ -38,10 +38,10 @@ ci   :切片項or定数項
 ```{r,eps1}
 set.seed(4414)
 n <- 500
-# 外生要因
+# 外生変数
 eps1 <- sign((rnorm(n))) * sqrt(abs(rnorm(n))) #sign:符号関数
 eps2 <- runif(n) - 0.5
-# x2をもとにx1を決定する
+# x1は内生変数
 x2 <- 3 + eps2
 x1 <- 0.9 * x2 + 7 + eps1
 
@@ -57,6 +57,15 @@ as(res, "amat") # Estimate DAG
 
 show(c(7,3)) #True 
 show(res$ci) #Estimate
+```
+
+
+```{r}
+cor(x1, x2, method="spearman") 
+
+plot(x1,x2) # xilmとylimで範囲を指定
+# 回帰直線を入れる場合は以下を追加
+abline(lm(x2~x1), col="red")
 ```
 
 ```{r,eps2}
