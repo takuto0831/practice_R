@@ -5,7 +5,6 @@ date: "2017年10月3日"
 output: html_document
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls(all=TRUE))
@@ -21,6 +20,7 @@ rm(list=ls(all=TRUE))
 library(igraph)
 library(RBGL)
 library(pcalg)
+library(bnlearn)
 ```
 
 ## LiNGAMの実行例を示す
@@ -32,6 +32,8 @@ Bpruned : $p \times p$ 行列 $B_{i,j}$ 成分は$j \rightarrow i$のエッジ�
 stde :予測誤差の逸脱度
 
 ci   :切片項or定数項
+
+### ここはpackageのサンプルデータ
 
 ```{r,eps1}
 set.seed(4414)
@@ -71,6 +73,7 @@ x3 <- 0.8*x2 + eps3
 x4 <- -x1 -0.9*x3 + eps4
 
 X <- cbind(x1,x2,x3,x4)
+
 #真の隣接行列
 trueDAG <- cbind(x1 = c(0,1,0,0), 
                  x2 = c(0,0,0,0), 
@@ -85,5 +88,12 @@ stopifnot(identical(res1, res2))
 
 show(trueDAG) # True DAG
 as(res1, "amat") # Estimate DAG
+```
+
+### movie lens DATA SETへの実行
+
+```{r}
+data(asia)
+str(asia)
 ```
 
