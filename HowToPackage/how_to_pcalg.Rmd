@@ -61,11 +61,11 @@ show(res$ci) #Estimate
 
 
 ```{r}
-cor(x1, x2, method="spearman") 
+cor(x2, x1, method="spearman") 
 
-plot(x1,x2) # xilmとylimで範囲を指定
+plot(x2,x1) # xilmとylimで範囲を指定
 # 回帰直線を入れる場合は以下を追加
-abline(lm(x2~x1), col="red")
+abline(lm(x1~x2), col="red")
 ```
 
 ```{r,eps2}
@@ -99,10 +99,25 @@ show(trueDAG) # True DAG
 as(res1, "amat") # Estimate DAG
 ```
 
-### movie lens DATA SETへの実行
+### ASIA DATA SETへの実行
 
 ```{r}
-data(asia)
-str(asia)
+asia %>% 
+  sapply(function(x) as.integer(x)) -> data
+```
+
+```{r}
+res <- lingam(data)
+a <- as(res, "amat")
+aa <- graph.adjacency(a)
+aa_name <- c("A","S","T","L","B","E","X","D")
+V(aa)$name <-aa_name
+plot(aa,layout=layout.circle)
+```
+
+```{r}
+res = empty.graph(names(asia))
+modelstring(res) = "[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]"
+plot(res)
 ```
 
