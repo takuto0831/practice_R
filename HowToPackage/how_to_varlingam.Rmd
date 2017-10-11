@@ -1,0 +1,36 @@
+---
+title: "VaRLiNGAM"
+author: "takuto kotsubo"
+date: "2017年10月12日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,message=FALSE}
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/BB.merge.R')
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/VARLiNGAM.R', encoding = 'UTF-8')
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/VAR_estim.R')
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/tsdata2canonicalform.R')
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/ols_est.R')
+source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/Gauss_Stats.R')
+```
+
+```{r}
+library(xts)
+library(dplyr)
+library(timeSeries)
+```
+
+
+```{r}
+a <- BB.merge("C:/Users/Rstudio/Desktop/practice_R/HowToPackage/csv/topix_last_day.csv") 
+```
+
+```{r}
+p <- tsdata2canonicalform(as.data.frame(a))
+VARLiNGAM(p)
+s```
+
