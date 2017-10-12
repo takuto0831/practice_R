@@ -23,10 +23,11 @@ Gauss_Stats <- function(X,n=NULL) {
 
   wi <- dims[2]*2.5
   x11(width=wi, height=5)
-  par(mfcol=c(2,dims[2]))
+  #par(mfcol=c(2,dims[2]))
   cat('The excess kurtosis are: \n')
 
   for (i in 1:dims[2]) {
+    dev.new()
     # histograms with normal distribution to compare
     hist(X[,i],breaks=n,freq=FALSE,mfg=c(1,i,2,dims[2]))
     m <- mean(X[,i])
@@ -42,6 +43,7 @@ Gauss_Stats <- function(X,n=NULL) {
     norm <- (X[,i]-m)/s
     # excess kurtosis
     cat('   ', mean(norm^4)-3*(mean(norm^2))^2, '\n')
+    dev.off()
   }
 
 }

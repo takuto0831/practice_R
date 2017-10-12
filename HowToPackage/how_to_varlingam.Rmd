@@ -7,30 +7,57 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
 ```
 
 ```{r,message=FALSE}
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/BB.merge.R')
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/VARLiNGAM.R', encoding = 'UTF-8')
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/VAR_estim.R')
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/tsdata2canonicalform.R')
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/ols_est.R')
-source('C:/Users/Rstudio/Desktop/practice_R/HowToPackage/rsource/Gauss_Stats.R')
-```
-
-```{r}
 library(xts)
 library(dplyr)
 library(timeSeries)
+library(tseries)
+library(nortest)
+library(pcalg)
+library(fastICA)
+library(quantreg)
+library(pipeR)
+#library(sm)
+```
+
+```{r,include=FALSE}
+getwd() %>>%  
+  paste("/VARLiNGAM",sep = "") %>>% 
+  list.files(full.names = T) %>>% 
+  lapply(source)
+```
+
+```{r,include=FALSE}
+getwd() %>>%
+  paste("/csv/topix_last_day.csv",sep = "") %>>%
+  BB.merge %>>% 
+  as.data.frame() -> a
+```
+
+```{r}
+str(a)
+head(a)
 ```
 
 
 ```{r}
-a <- BB.merge("C:/Users/Rstudio/Desktop/practice_R/HowToPackage/csv/topix_last_day.csv") 
+# 1-8を使用する
+p <- tsdata2canonicalform(a[,1:5])
+# 全部使うとエラー
+#p <- tsdata2canonicalform(a)
+ans <- VARLiNGAM(p)
+
 ```
 
 ```{r}
-p <- tsdata2canonicalform(as.data.frame(a))
-VARLiNGAM(p)
-s```
+# $resid: 残差
+# $const: estimated constant term of VAR
+# $Mhat: estimated regression coefficients of VAR
+# $Bhat: estimated regression coefficients of SVAR (adjusted Mhat with instantenous effects taken account for)
+# $var_order: a causal order of the variables
+ans
+```
 
