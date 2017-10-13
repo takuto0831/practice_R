@@ -49,7 +49,6 @@ p <- tsdata2canonicalform(a[,1:5])
 # 全部使うとエラー
 #p <- tsdata2canonicalform(a)
 ans <- VARLiNGAM(p)
-
 ```
 
 ```{r}
