@@ -1,0 +1,147 @@
+---
+title: "projected normal distribution"
+author: "takuto kotsubo"
+date: "2017年11月5日"
+output:
+    html_document:
+    toc: true
+    toc_depth: 3
+---
+
+## 目的
+the general projected normal distribution of arbitrary dimension (任意の次元での一般化正規分布)
+に関する論文の概要及び, 実装？？
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 要旨
+
+general projected normal distribution は簡単かつ直感的モデル, 多次元の方向データにおいて.
+多変量正規乱数ベクトルをその長さで割って,そのベクトルを単位超球面上に投影する.
+このモデルの二次元制約の元での推論では,ベイズ理論が用いられ,潜在的な長さを発生させる.また,メトロポリスギブスアルゴリズムにより事後確率からサンプリングする.
+
+the general projected normal distribution は重要な三次元球面での場合も含み,あらゆる次元での推論を可能にする.
+この新しいパラメータ化において,未知のパラメータの完全な条件文は閉形式であり,拒絶の必要なしに潜在的な長さを描く新しいスライスサンプラーを提案する.
+
+ギブスサンプリングはこの新しいスキームを利用することで高速かつ簡易になり,ベイズ推論の向上に導く.
+たとえば,複雑な混合モデルや巨大なデータセットの回帰モデルからモデル選択を出来る.
+
+パラメータ化はまた,多変量正規分布の共分散行列への共変量の直接的な組み込みを可能にし,モデルの方向性データを独立回帰の関数として説明する能力を高める.
+
+円や球面の場合は細部を考慮したうえで,科学的適用を説明される.
+円形の場合,漁場からの釣り人の移動時刻の季節変化は,平均ベクトルと共分散行列の共変量を用いてモデル化される.
+球面の場合,タンパク質の主鎖に沿った炭素原子の相対的位置を表す対の角度を考慮する.
+
+私たちは,これらのデータにgeneral projected normals の混合モデルを適用する.
+最終的にシュミレーションによりこのメソッドの有意性を10次元および50次元の場合で示す.
+
+key words:circular data, directional data, Gibbs sampler, Markov chain Monte
+Carlo, protein structure analysis, spherical data.
+
+## 導入
+### 方向データ
+
+円形データや球面データの例, 過去の論文での手法を概観する.
+
+projected normal distributions (http://dx.doi.org/10.2307/2669850)
+
+### Projected normal distribution
+
+射影分布(projected distribution)は平面または空間上の分布の放射状投影によって得られる. より一般的には, 多変量正規乱数ベクトルをその長さで割って, そのベクトルを単位超球面上に投影する.
+
+$k \geq 2$ の場合, 単位ランダムベクトル$U$が$U = X/||X|| \sim \mathcal{PN}_k(\mu,\Sigma)$に従い, general projected normal distribution のパラメータ$\mu, \Sigma$は多変量正規分布の$X \sim \mathcal{N}_k(\mu, \Sigma)$に従う.
+
+単位ベクトル$U$は, 座標系の適切な選択によって指向性ランダムベクトル$\Theta$として解釈される.
+円形の場合, ランダム方向$\Theta$は極座標上の$U = (\cos\Theta, \sin\Theta)^T$から得られる.
+
+Projected normal distributions は off-set normal distributions とも呼ばれる.
+
+Wang and Gelfand (2013) and Wang and Gelfand (2014) によると,$\Sigma \neq I$のもとで$\mathcal{PN}_2(\mu,\Sigma$)のとき, 特別な円形データの場合, $U = (\cos\Theta, \sin\Theta)^T$の密度は以下で示せる.
+
+$$ 
+p(\theta|\mu, \Sigma) = \frac{1}{2\pi A(\theta)}|\Sigma|^{-\frac{1}{2}} 
+\exp(C)\left\{1 + \frac{B(\theta)}{\sqrt{A(\theta)}} \frac{\Phi \left(\frac{B(\theta)}{\sqrt{A(\theta)}}\right)}{\phi \left(\frac{B(\theta)}{\sqrt{A(\theta)}}\right)}\right\} I_{[0,2\pi)} (\theta)
+$$
+
+$u^T = (\cos\theta,\sin\theta), A(\theta) = u^T\Sigma^{-1}u, B(\theta) = u^T \Sigma^{-1} \mu, C = -\frac{1}{2} \mu^T \Sigma^{-1} \mu$であり, $I_{[0,2\pi)} (\cdot)$はインジケータ機能(??) $\Phi(\cdot),\phi(\cdot)$ は標準正規分布(分布関数？？)と密度関数である.
+
+$\mathcal{PN}_k(\mu,\Sigma)$は非対称もしくは二峰性となる.$\mu$が$\Sigma$の固有ベクトルのいずれかと直交する場合, 分布は対称となる. ランダム変数$X$をスケール化しても, $U$の分布は変わらない. 識別可能性のためにパラメータに以下の制約が必要である.
+
+$$
+\Sigma = \left(
+    \begin{array}{cc}
+      \tau^2 & \rho \tau  \\
+      \rho \tau & 1 
+    \end{array}
+  \right) , \mu = (\mu_1, \mu_2)
+$$
+
+$\mu$は二変量正規事前分布$\mathcal N_2 (0,\lambda_0I)$, $\rho$は一様事前分布$\mathcal u(-1,1)$, $\tau^2$は逆ガンマ事前分布$\mathcal{IG}(a_{\tau},b_{\tau})$に従う. このパラメータ化の下で, $\tau^2$や$\rho$の閉形式でない完全な条件付事後確率が得られる. よって, メトロポリス・ヘイスティングスを通じて, $\tau^2$や$\rho$や潜在長を繰り返し求められる.
+
+## General projected normal distribution
+
+私たちはgeneral projected normal $\mathcal{PN}_k(\mu,\Sigma)$を任意の次元に適用する. 
+制約付き共分散行列の代替パラメータ化を使用することにより$(\Sigma \neq I)$, モデルの完全な条件付きパラメータのすべてを閉式的に得ることができる. 新しいパラメータ化は重要な球面を含む, いかなる次元にも適用でき, 共変量を共分散行列に組みこむことを可能にする.さらに,潜在長を描く新たなスライスサンプラーを提案する.
+
+### Reparameterizing the general projected normal 
+
+Wang and Gelfand（2013）の2次元の場合のように, 一般性を失うことなく, $k \times k$ 共分散行列$\Sigma$の対角項の1つを1に制限する.
+
+$$
+\Sigma = \left(
+    \begin{array}{cc}
+      \Gamma & \gamma \\
+      \gamma^T & 1 
+    \end{array}
+  \right)
+$$
+
+$\gamma$は$k-1$ベクトルの回帰係数であり, $\Sigma$は非負値である. 従って共分散行列は
+
+$$
+\Sigma = \left(
+    \begin{array}{cc}
+      \Sigma^* + \gamma \gamma^T & \gamma \\
+      \gamma^T & 1 
+    \end{array}
+  \right)
+$$
+
+ここで, $\Sigma^*$は,,, $\Sigma$は非負値であり, ランダムベクトル$Z = (I - \gamma) Y$を定義する. $Y$は平均 $0$かつ共分散行列$\Sigma$のランダムベクトルである. $var(Z) = \Gamma - \gamma \gamma^T = \Sigma^*$は非負値である. もし$\Sigma^*$が非負値なら, $(c^T,d)^T \in \mathbb{R}^k$は非ゼロベクトル$c\in \mathbb{R}^{k-1}$を用いて,
+
+$$
+\left(
+    \begin{array}{cc}
+      c^T & d 
+    \end{array}
+  \right)
+\left(
+    \begin{array}{cc}
+      \Sigma^* + \gamma \gamma^T & \gamma \\
+      \gamma^T & 1 
+    \end{array}
+  \right)
+\left(
+    \begin{array}{c}
+      c \\ d 
+    \end{array}
+  \right)
+  = c^T \Sigma^* c + (\gamma^Tc + d)^2 \geq 0
+$$
+
+よって$\Sigma$は非負値である.
+
+$\mu = (\mu_1,\mu_2,\ldots,\mu_k)^T, \mu_{-k} = (\mu_1,\mu_2,\ldots,\mu_{k-1}),(x_{1,i},x_{2,i},\ldots,,x_{k,i})^T = r_iu_i, ||u_i|| = 1$
+球面座標を作る, $u_i$は$k-1$角度列$(\theta_{1,i}, \theta_{2,i}, \ldots, \theta_{k-1,i})= \theta_i$である.
+$\theta_{k-1,i} \in [0,2\pi), \theta_{s,i} \in [0,\pi)$ただし$s = 1,\ldots,k-2$である.すなわち, $(r_i,\theta_i)$の結合密度は以下で示せる.
+
+$$
+p(r_i,\theta_i | \mu, \Sigma) = \left(\frac{1}{2\pi}\right)^{\frac{k}{2}} |\Sigma|^{-\frac{1}{2}}r_i^{k-1} \exp \left\{-\frac{1}{2}(r_i u_i - \mu)^T \Sigma^T (r_iu_i - \mu) \right\} \\
+= r_i^{k-1} p(x_{1,i},x_{2,i},\ldots,,x_{k,i}|x_{k,i}, \mu, \Sigma) p(\gamma^Tc + d)^2 \geq 0
+$$
+
+$p(x_{1,i},x_{2,i},\ldots,,x_{k,i}|x_{k,i}, \mu, \Sigma)$は平均が$\mu_{-k} + \gamma(x_{k,i} - \mu_k)$かつ分散が$\Sigma^*$の正規分布
+
+
