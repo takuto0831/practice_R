@@ -142,6 +142,49 @@ p(r_i,\theta_i | \mu, \Sigma) = \left(\frac{1}{2\pi}\right)^{\frac{k}{2}} |\Sigm
 = r_i^{k-1} p(x_{1,i},x_{2,i},\ldots,,x_{k,i}|x_{k,i}, \mu, \Sigma) p(\gamma^Tc + d)^2 \geq 0
 $$
 
-$p(x_{1,i},x_{2,i},\ldots,,x_{k,i}|x_{k,i}, \mu, \Sigma)$は平均が$\mu_{-k} + \gamma(x_{k,i} - \mu_k)$かつ分散が$\Sigma^*$の正規分布
+$p(x_{1,i},x_{2,i},\ldots,,x_{k,i}|x_{k,i}, \mu, \Sigma)$は平均が$\mu_{-k} + \gamma(x_{k,i} - \mu_k)$かつ分散が$\Sigma^*$の正規分布の密度である.$p(x_{k,i}| \mu, \Sigma)$は平均$\mu_k$かつ分散$1$の正規分布の密度である.$\mu,\gamma$の事前分布や$\Sigma$の逆ウィシャート事前分布を置くことで, 完全で条件付な閉式を得られる.前式から私たちはproject normal density($p(\theta_i|\mu,\Sigma) = \int p(r_i, \theta_i| \mu, \Sigma)dr$)を獲得する.
+
+単位球面上の面容積は$d\theta_{k-1,i} \prod^{k-2}_{s=1}[sin(\theta_{s,i})]^{k-1-s}d\theta_{s,i \cdot}$である.
+
+
+### Incorporatingcovariates in the general projected normal
+
+後述
+
+### Slice sampling for latent lengths
+
+後述
+
+## Circular case
+
+円形の場合は$x_{1,i} = r_i \cos \theta_i, x_{2,i} = r_i\sin \theta_i, \mu = (\mu_1,\mu_2)$として,
+
+$$
+\Sigma = \left(
+    \begin{array}{cc}
+      \sigma^2 + \gamma^2& \gamma \\
+      \gamma & 1 
+    \end{array}
+  \right)
+$$
+
+さらに$(r_i,\theta_i)$の結合確率は,
+
+$$
+p(r_i,\theta_i|\mu,\Sigma) = \left(\frac{1}{2\pi\sigma}\right)^{\frac{k}{2}} r_i \exp \left\{-\frac{1}{2\sigma^2}(r_i u_i - \mu)^T \left(
+    \begin{array}{cc}
+      1 & -\gamma \\
+      -\gamma & \sigma^2 + \gamma^2 
+    \end{array}
+  \right) (r_iu_i - \mu) \right\} \\
+  = r_i p(x_{1,i}|x_{2,i}, \mu, \Sigma) p(x_{2,i}|\mu, \Sigma)
+$$
+
+$p(x_{1,i}|x_{2,i}, \mu, \Sigma)$は平均が$\mu_1 + \gamma(x_{2,i} - \mu_2)$かつ分散が$\sigma^2$の正規分布の密度である. $p(x_{2,i}|\mu, \Sigma)$は平均$\mu_2$かつ分散$1$の正規分布の密度である.$\mu,\gamma$の事前分布や$\sigma$の逆ガンマ事前分布を置くことで, 完全で条件付な閉式を得られる. $\gamma, \sigma^2$の分布は,
+
+$$
+(\gamma|\cdot) \sim \mathcal N\left(\frac{\sigma^{-2} \sum^n_{i=1}(x_{1,i} - \mu_1)(x_{2,i} - \mu_2)
++ \mu_\gamma \sigma_\gamma^{-2}}{\sigma^{-2} \sum^n_{i=1}(x_{2,i} - \mu_2)^2
++ \sigma_\gamma^{-2}},   \right)$$
 
 
