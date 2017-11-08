@@ -245,6 +245,7 @@ Sigma = matrix(c(sigma1^2,rho*sigma1*sigma2,
 ```
 ```{r}
 # projcted normal (式(1))
+# サンプルデータを作成する
 
 projected_normal_circular <- function(theta,mu,Sigma){
   u = matrix(c(cos(theta),sin(theta)),ncol=1)
@@ -252,7 +253,8 @@ projected_normal_circular <- function(theta,mu,Sigma){
   B = t(u) %*% solve(Sigma) %*% mu
   C = (-1/2) * (t(mu) %*% solve(Sigma) %*% mu)
   tmp = B/sqrt(A)
-  p = 1/(2*pi*A*sqrt(det(Sigma))) * exp(C)*(1 + tmp*dnorm(tmp,0,1)/pnorm(tmp,0,1))
+  p = (1/(2*pi*A*sqrt(det(Sigma)))) * exp(C) * 
+      (1 + tmp*pnorm(tmp,0,1)/dnorm(tmp,0,1))
   return(p)
 }
 
@@ -262,26 +264,34 @@ plot(theta,x,xlim = c(0,2*pi))
 ```
 
 ```{r}
-library(MASS)
-library(mvtnorm)
-# 違う論文バージョン
-# よくわからない
-projected_normal_circular_2 <- function(theta,mu,Sigma){
-  phi2 = dmvnorm(mu %>% as.vector(),c(0,0),Sigma)
-  a = 1/sqrt(det(Sigma))
-  C = a^2 * (t(u) %*% solve(Sigma) %*% u)
-  D = a^2 * (1/sqrt(C)) * (t(u) %*% solve(Sigma) %*% mu)
-  ans = phi2/C + a*D
-  }
+# sampling from projected normal distribution
+# 累積確率
+y <- foreach(i=1:length(x), .combine = c) %do% sum(x[1:i])
+# 一様分布的に求める
+PN_sample <- function(y,theta){
+  tmp <- runif(1,min = min(y),max = max(y))
+  for(i in 1:length(y)) if(tmp > y[i] && tmp < y[i+1]) return(theta[i])
+}
+# サンプル数
+iter = 500
+pn_sample <- foreach(i=1:iter, .combine = c) %do% PN_sample(y,theta)
+hist(pn_sample)
+```
 
+
+```{r}
+# moVMFで再現
+library(movMF)
+y <- movMF(cbind(theta,x), 2, nruns = 10)
+x_movMF <- rmovMF(500,y$theta,y$alpha)
+plot(x_movMF)
 ```
 
 ## Spherical case
 
 ### simulation spherical data
 
-
-```{r}
+```{r,eval=FALSE}
 # パラメータ
 mu = matrix(c(1.26,-0.62,0.23),ncol=1)
 Sigma = diag(c(2.11,2.46,2.38),ncol = 3) %*%
@@ -291,7 +301,7 @@ Sigma = diag(c(2.11,2.46,2.38),ncol = 3) %*%
         diag(c(2.11,2.46,2.38),ncol = 3)
 ```
 
-```{r}
+```{r,eval=FALSE}
 projected_normal_spherical <- function(theta1,theta2,mu,Sigma){
   u = matrix(c(cos(theta1)*sin(theta2),sin(theta1)*sin(theta2),cos(theta2)),ncol=1)
   A = t(u) %*% solve(Sigma) %*% u
@@ -304,14 +314,14 @@ projected_normal_spherical <- function(theta1,theta2,mu,Sigma){
 }
 ```
 
-```{r}
+```{r,eval=FALSE}
 theta1 = seq(0,2*pi,0.01)
 theta2 = seq(0,pi,0.01)
 for(i in theta1){
   if(i == 1) x <- foreach(j=theta2, .combine = c) %do% projected_normal_circular(i,j,mu,Sigma)
   else{
     y <- foreach(j=theta2, .combine = c) %do% projected_normal_circular(i,j,mu,Sigma)
-    x <- c(y)
+    x <- c(x,y)
     }
 }
 ```
