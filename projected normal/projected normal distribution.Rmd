@@ -278,8 +278,16 @@ pn_sample <- foreach(i=1:iter, .combine = c) %do% PN_sample(y,theta)
 hist(pn_sample)
 ```
 
+## mcmc でパラメータを予測する.
+
+[http://www.tandfonline.com/doi/pdf/10.1080/02664760500164886?needAccess=true]
 
 ```{r}
+
+```
+
+
+```{r,eval=FALSE}
 # moVMFで再現
 library(movMF)
 y <- movMF(cbind(theta,x), 2, nruns = 10)
