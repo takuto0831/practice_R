@@ -281,6 +281,9 @@ hist(pn_sample)
 ## mcmc でパラメータを予測する.
 
 [http://www.tandfonline.com/doi/pdf/10.1080/02664760500164886?needAccess=true]
+[http://statmodeling.hatenablog.com/entry/gaussian-process-2]
+[https://heavywatal.github.io/rstats/stan.html]
+[http://norimune.net/2810]
 
 ```{r}
 
