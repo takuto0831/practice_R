@@ -290,10 +290,23 @@ hist(pn_sample)
 
 ```{r,eval=FALSE}
 rstan_options(auto_write=TRUE)
-options(mc.cores=parallel::detectCores())
-
-fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",data=list(N=500,theta=pn_sample))
+#options(mc.cores=parallel::detectCores())
+options(mc.cores=parallel::detectCores()-1)
+fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
+            data=list(N=500,theta=pn_sample),iter = 2000,chains = 4,open_progress = FALSE)
 ```
+
+
+```{r}
+
+mu = matrix(c(fit$`mu[1]`,fit$`mu[2]`),ncol=1)
+sigma1 = 1.58
+sigma2 = 1.4
+rho = -0.84
+Sigma = matrix(c(sigma1^2,rho*sigma1*sigma2,
+                 rho*sigma1*sigma2,sigma2^2),ncol=2)
+```
+
 
 
 ```{r,eval=FALSE}
