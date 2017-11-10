@@ -294,6 +294,8 @@ rstan_options(auto_write=TRUE)
 options(mc.cores=parallel::detectCores()-1)
 fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
             data=list(N=500,theta=pn_sample),iter = 2000,chains = 4,open_progress = FALSE)
+
+#fit <- stan("C:/Users/SHIO-160412-4/Desktop/sam.stan",iter=10)
 ```
 
 

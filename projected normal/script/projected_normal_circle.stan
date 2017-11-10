@@ -6,15 +6,17 @@ functions{
     real C;
     real tmp;
     real p;
+    real pdf;
     u[1] = cos(theta);
     u[2] = sin(theta);
     A = u' * inverse(sigma) * u;
     B = u' * inverse(sigma) * mu;
     C = (-1/2) * (mu' * inverse(sigma) * mu);
     tmp = B/sqrt(A);
+    pdf = exp(-(tmp^2)/2) / sqrt(2*pi());
     p = (1/(2*A*sqrt(determinant(sigma)))) * exp(C) * 
-        (1 + tmp*normal_cdf(tmp,0,1) / normal_lpdf(tmp|0,1));
-    return log(p);
+        (1 + tmp*normal_cdf(tmp,0,1) / pdf);
+    return p;
   }
 }
 
@@ -43,3 +45,4 @@ model{
     theta[n] ~ pn_circle(mu,sigma);
   }
 }
+
