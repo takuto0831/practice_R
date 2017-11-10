@@ -33,6 +33,7 @@ library(tidyverse)
 library(rgl)
 library(pipeR)
 library(foreach)
+library(rstan)
 ```
 
 ## 要旨
@@ -243,6 +244,7 @@ rho = -0.84
 Sigma = matrix(c(sigma1^2,rho*sigma1*sigma2,
                  rho*sigma1*sigma2,sigma2^2),ncol=2)
 ```
+
 ```{r}
 # projcted normal (式(1))
 # サンプルデータを作成する
@@ -284,9 +286,13 @@ hist(pn_sample)
 [http://statmodeling.hatenablog.com/entry/gaussian-process-2]
 [https://heavywatal.github.io/rstats/stan.html]
 [http://norimune.net/2810]
+[https://stan-ja.github.io/gh-pages-html/#%E3%82%B0%E3%83%AB%E3%83%BC%E3%83%94%E3%83%B3%E3%82%B0%E3%81%AE%E3%81%9F%E3%82%81%E3%81%AE%E6%8B%AC%E5%BC%A7]
 
-```{r}
+```{r,eval=FALSE}
+rstan_options(auto_write=TRUE)
+options(mc.cores=parallel::detectCores())
 
+fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",data=list(N=500,theta=pn_sample))
 ```
 
 
