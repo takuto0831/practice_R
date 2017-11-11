@@ -34,6 +34,7 @@ library(rgl)
 library(pipeR)
 library(foreach)
 library(rstan)
+library(coda)
 ```
 
 ## 要旨
@@ -275,13 +276,14 @@ PN_sample <- function(y,theta){
   for(i in 1:length(y)) if(tmp > y[i] && tmp < y[i+1]) return(theta[i])
 }
 # サンプル数
-iter = 500
+iter = 2000
 pn_sample <- foreach(i=1:iter, .combine = c) %do% PN_sample(y,theta)
 hist(pn_sample)
 ```
 
 ## mcmc でパラメータを予測する.
 
+[http://blog.cybozu.io/entry/2015/10/21/110218]
 [http://www.tandfonline.com/doi/pdf/10.1080/02664760500164886?needAccess=true]
 [http://statmodeling.hatenablog.com/entry/gaussian-process-2]
 [https://heavywatal.github.io/rstats/stan.html]
@@ -293,20 +295,16 @@ rstan_options(auto_write=TRUE)
 #options(mc.cores=parallel::detectCores())
 options(mc.cores=parallel::detectCores()-1)
 fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
+            data=list(N=2000,theta=pn_sample),iter = 10000,chains = 4,open_progress = FALSE)
+
+fit_log <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle_log.stan",
             data=list(N=500,theta=pn_sample),iter = 2000,chains = 4,open_progress = FALSE)
 
-#fit <- stan("C:/Users/SHIO-160412-4/Desktop/sam.stan",iter=10)
 ```
 
-
-```{r}
-
-mu = matrix(c(fit$`mu[1]`,fit$`mu[2]`),ncol=1)
-sigma1 = 1.58
-sigma2 = 1.4
-rho = -0.84
-Sigma = matrix(c(sigma1^2,rho*sigma1*sigma2,
-                 rho*sigma1*sigma2,sigma2^2),ncol=2)
+```{r,eval=FALSE}
+fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
+plot(fit.coda)
 ```
 
 

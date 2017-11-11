@@ -13,8 +13,8 @@ functions{
     B = u' * inverse(sigma) * mu;
     C = (-0.5) * (mu' * inverse(sigma) * mu);
     tmp = B/sqrt(A);
-    pdf = exp(-(tmp^2.0)/2.0)/sqrt(6.2831);
-    p = (1.0/(6.2831*A*sqrt(determinant(sigma)))) * exp(C) * 
+    pdf = exp(-(tmp^2.0)/2.0)/sqrt(2*pi());
+    p = (1.0/(2*pi()*A*sqrt(determinant(sigma)))) * exp(C) * 
         ((tmp * normal_cdf(tmp,0,1) / pdf) + 1.0);
     return p;
   }
@@ -22,7 +22,7 @@ functions{
 
 data{
   int N; //sample size
-  real theta[N]; //data
+  real<lower=0.0, upper=2*pi()> theta[N]; //data
 }
 
 parameters{
