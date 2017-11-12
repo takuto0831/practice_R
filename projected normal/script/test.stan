@@ -13,16 +13,16 @@ functions{
     B = u' * inverse(sigma) * mu;
     C = (-0.5) * (mu' * inverse(sigma) * mu);
     tmp = B/sqrt(A);
-    pdf = exp(-(tmp^2.0)/2.0)/sqrt(2*pi());
-    p = (1.0/(2*pi()*A*sqrt(determinant(sigma)))) * exp(C) * 
-        ((tmp * normal_cdf(tmp,0,1) / pdf) + 1.0);
+    pdf = exp(-(tmp^2)/2.0)/sqrt(2*pi());
+    p = - log(2*pi())-log(A)-log(sqrt(determinant(sigma))) + C
+        + log(1+(tmp * normal_cdf(tmp,0,1)/pdf));
     return p;
   }
 }
 
 data{
   int N; //sample size
-  real<lower=0.0, upper=2*pi()> theta[N]; //data
+  real<lower=0,upper=2*pi()> theta[N]; //data
 }
 
 parameters{

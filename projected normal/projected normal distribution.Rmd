@@ -290,24 +290,39 @@ hist(pn_sample)
 [http://norimune.net/2810]
 [https://stan-ja.github.io/gh-pages-html/#%E3%82%B0%E3%83%AB%E3%83%BC%E3%83%94%E3%83%B3%E3%82%B0%E3%81%AE%E3%81%9F%E3%82%81%E3%81%AE%E6%8B%AC%E5%BC%A7]
 
-```{r,eval=FALSE}
+```{r}
 rstan_options(auto_write=TRUE)
-#options(mc.cores=parallel::detectCores())
 options(mc.cores=parallel::detectCores())
-fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
-            data=list(N=2000,theta=pn_sample),iter = 5000,chains = 4,open_progress = FALSE)
 
-fit_log <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle_log.stan",
-            data=list(N=500,theta=pn_sample),iter = 2000,chains = 4,open_progress = FALSE)
+##fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
+##            data=list(N=2000,theta=pn_sample),iter = 5000,chains = 4,open_progress = FALSE)
 
+fit <- stan("C:/Users/Rstudio/Desktop/practice_R/projected normal/script/test.stan",
+            data=list(N=2000,theta=pn_sample),iter = 10000,chains = 5,open_progress = FALSE)
+```
+
+```{r}
+# 値の抽出
+fit_ext <- extract(fit,permuted=T)
+
+# シュミレーション値
+mu_ = matrix(c(fit_ext$mu[,1] %>% mean(),fit_ext$mu[,2] %>% mean()),ncol=1)
+Sigma_ = matrix(c(fit_ext$sigma[,1,1] %>% mean(),fit_ext$sigma[,1,2] %>% mean(),
+                 fit_ext$sigma[,2,1] %>% mean(),1),ncol=2)
+
+# 真値と予測値をプロット
+theta = seq(0,2*pi,0.01)
+x_ <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu_,Sigma_)
+data.frame(theta = theta,True = x,predict = x_) %>%
+  gather(label,prob,-theta) %>% 
+  ggplot(aes(x=theta,y=prob)) + 
+  geom_line(aes(color = label))
 ```
 
 ```{r,eval=FALSE}
 fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
 plot(fit.coda)
 ```
-
-
 
 ```{r,eval=FALSE}
 # moVMFで再現
