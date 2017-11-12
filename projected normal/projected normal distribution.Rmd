@@ -293,9 +293,9 @@ hist(pn_sample)
 ```{r,eval=FALSE}
 rstan_options(auto_write=TRUE)
 #options(mc.cores=parallel::detectCores())
-options(mc.cores=parallel::detectCores()-1)
+options(mc.cores=parallel::detectCores())
 fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
-            data=list(N=2000,theta=pn_sample),iter = 10000,chains = 4,open_progress = FALSE)
+            data=list(N=2000,theta=pn_sample),iter = 5000,chains = 4,open_progress = FALSE)
 
 fit_log <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle_log.stan",
             data=list(N=500,theta=pn_sample),iter = 2000,chains = 4,open_progress = FALSE)

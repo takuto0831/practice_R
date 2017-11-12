@@ -1,3 +1,7 @@
+//real foo(real theta){
+//  if (theta > 0 && theta < 2*pi()) return 1.0;
+//  else return 0.0;
+//}
 functions{
   real pn_circle_lpdf(real theta,vector mu,matrix sigma){
     vector[2] u;
@@ -6,23 +10,24 @@ functions{
     real C;
     real tmp;
     real p;
-    real pdf;
+    real f;
     u[1] = cos(theta);
     u[2] = sin(theta);
     A = u' * inverse(sigma) * u;
     B = u' * inverse(sigma) * mu;
     C = (-0.5) * (mu' * inverse(sigma) * mu);
     tmp = B/sqrt(A);
-    pdf = exp(-(tmp^2.0)/2.0)/sqrt(6.2831);
-    p = (1.0/(6.2831*A*sqrt(determinant(sigma)))) * exp(C) * 
-        ((tmp * normal_cdf(tmp,0,1) / pdf) + 1.0);
+    f = exp(-(tmp^2.0)/2.0)/sqrt(2*pi());
+    p = (1.0/(2*pi()*A*sqrt(determinant(sigma)))) * exp(C) *
+        ((tmp * 0.5 / f) + 1.0);
+        //((tmp * normal_cdf(tmp,0,1) / f) + 1.0);
     return p;
   }
 }
 
 data{
   int N; //sample size
-  real theta[N]; //data
+  real<lower = 0,upper = 2*pi()> theta[N]; //data
 }
 
 parameters{
