@@ -9,6 +9,11 @@ output:
       toc_depth: 3
 ---
 
+## 参考ページ
+[rstan fucntionsについて](http://watanabe-www.math.dis.titech.ac.jp/~nakamura_f/seminar_1022.pdf)
+
+[rstan 作成者のgithub 関数作成のヒント](https://github.com/avehtari/BDA_R_demos/blob/master/demos_rstan/gpareto.stan)
+
 ## 目的
 the general projected normal distribution of arbitrary dimension (任意の次元での一般化正規分布)
 に関する論文の概要及び, 実装？？
@@ -65,8 +70,6 @@ Carlo, protein structure analysis, spherical data.
 ### 方向データ
 
 円形データや球面データの例, 過去の論文での手法を概観する.
-
-projected normal distributions (http://dx.doi.org/10.2307/2669850)
 
 ### Projected normal distribution
 
@@ -233,7 +236,7 @@ $\sigma^2_\gamma,\mu_\gamma$はパラメータ$\gamma$の事前分散,事前平�
 
 パラメータを$\mu = (-0.19, 2.09)^T, \sigma_1^2 = 1.58, \sigma_2^2 = 1.4 , \rho = -0.84$として, ギブスサンプリングを行う.
 
-参考[https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3773532/]
+[参考論文](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3773532/)
 
 ```{r}
 # ここからサンプリング
@@ -283,12 +286,15 @@ hist(pn_sample)
 
 ## mcmc でパラメータを予測する.
 
-[http://blog.cybozu.io/entry/2015/10/21/110218]
-[http://www.tandfonline.com/doi/pdf/10.1080/02664760500164886?needAccess=true]
-[http://statmodeling.hatenablog.com/entry/gaussian-process-2]
-[https://heavywatal.github.io/rstats/stan.html]
-[http://norimune.net/2810]
-[https://stan-ja.github.io/gh-pages-html/#%E3%82%B0%E3%83%AB%E3%83%BC%E3%83%94%E3%83%B3%E3%82%B0%E3%81%AE%E3%81%9F%E3%82%81%E3%81%AE%E6%8B%AC%E5%BC%A7]
+[stan blog](http://blog.cybozu.io/entry/2015/10/21/110218)
+
+[ガウス過程シリーズ 2 高速化＆フルベイズ](http://statmodeling.hatenablog.com/entry/gaussian-process-2)
+
+[stan manual](https://heavywatal.github.io/rstats/stan.html)
+
+[stan 確率分布を自分で定義する](http://norimune.net/2810)
+
+[stan manual 日本語版](https://stan-ja.github.io/gh-pages-html/#%E3%82%B0%E3%83%AB%E3%83%BC%E3%83%94%E3%83%B3%E3%82%B0%E3%81%AE%E3%81%9F%E3%82%81%E3%81%AE%E6%8B%AC%E5%BC%A7)
 
 ```{r}
 rstan_options(auto_write=TRUE)
@@ -297,11 +303,13 @@ options(mc.cores=parallel::detectCores())
 ##fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/projected_normal_circle.stan",
 ##            data=list(N=2000,theta=pn_sample),iter = 5000,chains = 4,open_progress = FALSE)
 
-fit <- stan("C:/Users/Rstudio/Desktop/practice_R/projected normal/script/test.stan",
+fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/script/test.stan",
             data=list(N=2000,theta=pn_sample),iter = 10000,chains = 5,open_progress = FALSE)
 ```
 
 ```{r}
+#結果の確認
+fit
 # 値の抽出
 fit_ext <- extract(fit,permuted=T)
 
@@ -319,7 +327,16 @@ data.frame(theta = theta,True = x,predict = x_) %>%
   geom_line(aes(color = label))
 ```
 
-```{r,eval=FALSE}
+```{r}
+mu
+Sigma
+mu_
+Sigma_
+
+```
+
+
+```{r}
 fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
 plot(fit.coda)
 ```
