@@ -328,20 +328,24 @@ data.frame(theta = theta,True = x,predict = x_) %>%
 ```
 
 ```{r}
-mu
-Sigma
-mu_
-Sigma_
-
+mu #真値
+Sigma #真値
+mu_ #予測値
+Sigma_ #予測値
 ```
 
 
 ```{r}
-fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
+fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,1:3])))
 plot(fit.coda)
 ```
 
-```{r,eval=FALSE}
+```{r}
+fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,4:6])))
+plot(fit.coda)
+```
+
+```{r,eval=FALSE,include=FALSE}
 # moVMFで再現
 library(movMF)
 y <- movMF(cbind(theta,x), 2, nruns = 10)
@@ -353,7 +357,7 @@ plot(x_movMF)
 
 ### simulation spherical data
 
-```{r,eval=FALSE}
+```{r,eval=FALSE,include=FALSE}
 # パラメータ
 mu = matrix(c(1.26,-0.62,0.23),ncol=1)
 Sigma = diag(c(2.11,2.46,2.38),ncol = 3) %*%
@@ -363,7 +367,7 @@ Sigma = diag(c(2.11,2.46,2.38),ncol = 3) %*%
         diag(c(2.11,2.46,2.38),ncol = 3)
 ```
 
-```{r,eval=FALSE}
+```{r,eval=FALSE,include=FALSE}
 projected_normal_spherical <- function(theta1,theta2,mu,Sigma){
   u = matrix(c(cos(theta1)*sin(theta2),sin(theta1)*sin(theta2),cos(theta2)),ncol=1)
   A = t(u) %*% solve(Sigma) %*% u
@@ -376,7 +380,7 @@ projected_normal_spherical <- function(theta1,theta2,mu,Sigma){
 }
 ```
 
-```{r,eval=FALSE}
+```{r,eval=FALSE,include=FALSE}
 theta1 = seq(0,2*pi,0.01)
 theta2 = seq(0,pi,0.01)
 for(i in theta1){
