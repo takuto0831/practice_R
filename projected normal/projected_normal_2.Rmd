@@ -60,6 +60,8 @@ projected_normal_circular <- function(theta,mu,Sigma){
 
 ```{r}
 # sampling from projected normal distribution
+theta <- seq(0,2*pi,0.01)
+x <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu,Sigma)
 # 累積確率
 y <- foreach(i=1:length(x), .combine = c) %do% sum(x[1:i])
 # 一様分布的に求める
@@ -80,9 +82,7 @@ hist(pn_sample)
 ```{r,echo=FALSE,include=FALSE}
 #rstan_options(auto_write=TRUE)
 #options(mc.cores=parallel::detectCores())
-
-fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/stan/pn_gamma.stan",
-            data=list(N=100,theta=pn_sample),iter = 1000,chains = 1,open_progress = FALSE)
+fit <- stan("stan/pn_gamma.stan", data=list(N=100,theta=pn_sample),iter = 1000,chains = 1,open_progress = FALSE)
 ```
 
 ```{r}
@@ -98,8 +98,8 @@ Sigma_ = matrix(c(fit_ext$sigma[,1,1] %>% mean(),fit_ext$sigma[,1,2] %>% mean(),
 
 # 真値と予測値をプロット
 theta = seq(0,2*pi,0.01)
-x_ <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu_,Sigma_)
-data.frame(theta = theta,True = x,predict = x_) %>%
+x_gamma <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu_,Sigma_)
+data.frame(theta = theta,True = x,pred_gamma = x_gamma) %>%
   gather(label,prob,-theta) %>% 
   ggplot(aes(x=theta,y=prob)) + 
   geom_line(aes(color = label))
@@ -110,9 +110,7 @@ data.frame(theta = theta,True = x,predict = x_) %>%
 ```{r,echo=FALSE,include=FALSE}
 #rstan_options(auto_write=TRUE)
 #options(mc.cores=parallel::detectCores())
-
-fit <- stan("C:/Users/SHIO-160412-4/Desktop/practice_R/projected normal/stan/pn_halfcauchy.stan",
-            data=list(N=100,theta=pn_sample),iter = 1000,chains = 1,open_progress = FALSE)
+fit <- stan("stan/pn_halfcauchy.stan",data=list(N=100,theta=pn_sample),iter = 1000,chains = 1,open_progress = FALSE)
 ```
 
 ```{r}
@@ -128,9 +126,12 @@ Sigma_ = matrix(c(fit_ext$sigma[,1,1] %>% mean(),fit_ext$sigma[,1,2] %>% mean(),
 
 # 真値と予測値をプロット
 theta = seq(0,2*pi,0.01)
-x_ <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu_,Sigma_)
-data.frame(theta = theta,True = x,predict = x_) %>%
+x_cauchy <- foreach(i=theta, .combine = c) %do% projected_normal_circular(i,mu_,Sigma_)
+data.frame(theta = theta,True = x,pred_gamma = x_gamma,pred_cauchy = x_cauchy) %>%
   gather(label,prob,-theta) %>% 
   ggplot(aes(x=theta,y=prob)) + 
   geom_line(aes(color = label))
 ```
+
+
+
