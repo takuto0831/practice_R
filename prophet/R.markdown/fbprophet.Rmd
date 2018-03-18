@@ -1,0 +1,49 @@
+---
+title: "prophet"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# prophet package
+
+## summary
+
+Rやpython向けパッケージで時系列的手法で予測する。
+prophetに時系列データと数字を渡せばよい。季節的変動を自動で処理する。
+外れ値の影響や欠損値に対応する。（データの書き込みなしに）
+
+```{r, eval = FALSE}
+install.packages("prophet")
+```
+
+```{r}
+library(prophet)
+library(dplyr)
+```
+
+```{r}
+#peyton manning 選手のwikipediaの閲覧数（対数）
+df <- read.csv("csv/example_wp_peyton_manning.csv") %>%  
+  mutate(y = log(y))
+head(df)
+
+#fit the model
+m <- prophet(df)
+head(m)
+
+#1年多く予測期間を作る
+future <- make_future_dataframe(m, periods = 365)
+tail(future)
+
+#予測
+forecast <- predict(m, future)
+tail(forecast[c("ds", "yhat", "yhat_lower", "yhat_upper")])
+
+#plot
+plot(m, forecast)
+prophet_plot_components(m, forecast)
+```
+

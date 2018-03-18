@@ -1,0 +1,113 @@
+---
+title: "Competition of Bloomberg"
+author: "Sho Nitta"
+date: "5/6/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r setup2, include=FALSE}
+#文字化け防止
+Sys.setlocale("LC_CTYPE", "UTF-8")
+
+# set working directory
+if(base::dir.exists("~/Desktop/Bloomberg_Competition/")==FALSE){
+  base::dir.create("~/Desktop/Bloomberg_Competition/")
+}
+
+setwd("~/Desktop/Bloomberg_Competition/")
+rm(list = ls(all.names = T))
+```
+
+```{r library, include=FALSE}
+# load packages
+library(data.table)
+library(xts)
+library(ggplot2)
+library(rvest)
+library(foreach)
+
+# load functions
+#source("~/Desktop/Bloomberg_Competition/R.function/BB.merge.R")
+#source("~/Desktop/Bloomberg_Competition/R.function/data.cleaning.R")
+```
+
+```{r data, include=FALSE}
+# read data
+d.topix.tmp <- BB.merge("~/Desktop/Bloomberg_Competition/Data/topix_px_last_day.csv")
+d.topix.tmp2 <- d.topix.tmp[[1]]
+
+# date
+term.topix <- index(d.topix.tmp2)
+# asset name
+asset_name.topix <- colnames(d.topix.tmp2)
+
+# data cleaning
+d.topix <- datacleaning(d.topix.tmp2, term.topix, asset_name.topix)
+```
+
+```{r, include=FALSE}
+# rename colnames
+colnames(d.topix)[2] <- "TPXC30"
+colnames(d.topix) <- gsub(".JT.Equity", "", colnames(d.topix))
+colnames(d.topix)
+```
+
+```{r, include=FALSE}
+# make asset vector
+asset.vec <- gsub("X", "", colnames(d.topix))[-c(1,2)]
+asset.vec
+```
+
+```{r, include=FALSE}
+#文字コードはutf-8にする
+scraping <- function(url){
+  html.tmp <- read_html(url, encoding = "utf-8")
+  
+  buy.sell.tmp <- html.tmp %>% 
+    html_nodes("td:nth-child(3) a,td:nth-child(2)") %>%
+    html_text()
+  
+  return(buy.sell = buy.sell.tmp)
+}
+code <- scraping(url)
+```
+
+```{r, include=FALSE}
+scraping.all <- function(asset){
+  urls <- foreach(i = 2:50, .combine = c) %do% {
+    paste0("http://minkabu.jp/stock/", asset, "/pick?page=", i)
+  }
+  
+  num <- which(asset==asset.vec)
+  
+  print(paste0(asset, "???", num, "???????????????????????????..."))
+  
+  d.tmp <- foreach(i = urls, .combine = rbind) %do% {
+    scraping(i)
+  }
+  
+  return(d.tmp)
+}
+```
+
+```{r}
+data <- foreach(j = asset.vec) %do% {
+  scraping.all(j)
+}
+
+# confirmation
+str(data)
+head(data)
+
+foreach(i = 1:30) %do% {
+  write.csv(data[[i]],
+            paste0("~/Desktop/Bloomberg_Competition/output/", asset.vec[i], ".csv"),
+            row.names = FALSE)
+}
+```

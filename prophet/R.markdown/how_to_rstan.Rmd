@@ -1,0 +1,62 @@
+---
+title: "how_to_Rstan"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rstan)
+library(ggplot2)
+library(reshape2)
+library(plyr)
+```
+
+```{r}
+d <- read.table("data/conflict_sample.txt", header = T, quote = "\"")
+d$cv <- as.numeric(d$cv) - 1
+```
+
+
+
+```{r}
+d.dat <- list(N = dim(d)[1], M = dim(d)[2] - 1, X=d[,-8], y=d$cv)
+d.fit <- stan(file = "R.func/d.stan", data = d.dat, iter = 1000, chains =4)
+
+```
+```{r}
+d.fit
+```
+ 
+## 可視化する
+ 
+```{r}
+d.ext <- extract(d.fit, permuted = T)
+N.mcmc <- length(d.ext$beta0)
+
+b1 <- d.ext$beta[1:2000]
+b2 <- d.ext$beta[2001:4000]
+b3 <- d.ext$beta[4001:6000]
+
+bs <- data.frame(b1 = b1, b2 = b2, b3 = b3)
+bs.melt <- melt(bs, id=c(), variable.name = "param")
+
+#summarize & attach the name
+bs.qua.melt <- ddply(bs.melt, .(param), summarize,
+                     median = median(value),
+                     ymax = quantile(value, prob = 0.975),
+                     ymin = quantile(value, prob = 0.025))
+colnames(bs.qua.melt)[2] <- "value"
+
+bs.melt <- data.frame(bs.melt, ymax = rep(0, N.mcmc), ymin = rep(0,N.mcmc))
+
+#plot
+p <- ggplot(bs.melt,aes(x=param,y=value,group=param,ymax=ymax,ymin=ymin,color=param))
+p <- p + geom_violin(trim=F,fill="#5B423D",linetype="blank",alpha=I(1/3))
+p <- p + geom_pointrange(data=bs.qua.melt,size=0.75)
+p <- p + labs(x="",y="")+theme(axis.text.x=element_text(size=14),axis.text.y=element_text(size=14))
+ggsave(file="data/d.png",plot = p,dpi = 300,width = 4,height = 3)
+
+```

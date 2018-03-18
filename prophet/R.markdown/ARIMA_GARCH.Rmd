@@ -1,0 +1,317 @@
+---
+title: "kabu_yosoku"
+author: "kotsubotakuto"
+date: "2017年5月11日"
+output: 
+  html_document:
+    number_section: true
+    toc: true
+    toc_depth: 3
+---
+
+# ARIMA+GARCH 
+
+## Introduciton
+
+ARIMA:d階差分をとった系列が定常かつ反転可能なARMA(p,q)過程に従う過程は次数(p,d,q)の自己回帰和分移動平均過程
+
+## パッケージの読み込み
+
+```{r,message=FALSE}
+library(quantmod)
+library(lattice)
+library(timeSeries)
+library(rugarch)
+library(dplyr)
+library(xts)
+library(lattice)
+library(coda)
+library(foreach)
+```
+
+
+## 実装例
+
+```{r}
+#data set
+  symbol <- 998407 %>% as.character
+  data <- getSymbols(symbol
+                     ,src = "yahooj",from="2015-01-01",auto.assign = FALSE)
+  #getSymbols("^GSPC", from="2013-01-01",auto.assign = TRUE)
+  spReturns = diff(log(Cl(data)))
+  spReturns[as.character(head(index(Cl(data)),1))] = 0
+
+  #過去500このデータを使って明日のup,downを予測
+  windowLength = 100
+  foreLength = length(spReturns) - windowLength
+  forecasts <- vector(mode="character",length=foreLength)
+
+```
+
+```{r, eval=FALSE}
+  for (d in 0:foreLength)
+    {
+    spReturnsOffset <- spReturns[(1+d):(windowLength+d)] #500個のデータ
+    final.aic <- Inf
+    final.order <- c(0,0,0)
+    for (p in 0:5) for (q in 0:5)
+      {
+      if ( p == 0 && q == 0)
+        {
+        next
+      }
+      #best fitting ARMA model by AIC
+      #tryCatch():警告を検知して例外処理を行う
+      arimaFit <- tryCatch( arima(spReturnsOffset, order=c(p, 0, q)), error=function( err ) FALSE,warning=function( err ) FALSE )
+      
+      if( !is.logical( arimaFit ) )
+        {
+        current.aic <- AIC(arimaFit)
+         if (current.aic < final.aic)
+          {
+           final.aic <- current.aic
+           final.order <- c(p, 0, q)
+           final.arima <- arima(spReturnsOffset, order=final.order)
+           }
+         }
+      else
+        {
+          next
+        }
+    }
+    #どのようなGARCHモデルを推定するか定式化する
+    #garchorder:GARCH(1,1),finalorder:ARIMA(p,0,q)  
+    spec = ugarchspec(
+                    variance.model=list(garchOrder=c(1,1)),
+                    mean.model=list(armaOrder=c(final.order[1], final.order[3]), 
+                    include.mean=T),distribution.model="sged")
+      
+    fit = tryCatch(
+      ugarchfit(spec, spReturnsOffset, solver = 'hybrid'),
+      error=function(e) e, warning=function(w) w)
+    
+    #次の日がプラスなのかマイナスなのか(1or-1)
+    if(is(fit, "warning")) 
+      {
+      forecasts[d+1] = paste(index(spReturnsOffset[windowLength]), 1, sep=",")
+      print(paste(index(spReturnsOffset[windowLength]), 1, sep=","))
+      } else {
+          fore = ugarchforecast(fit, n.ahead=1)
+          ind = fore@forecast$seriesFor
+          forecasts[d+1] = paste(colnames(ind), ifelse(ind[1] < 0, -1, 1), sep=",")
+          print(paste(colnames(ind), ifelse(ind[1] < 0, -1, 1), sep=","))  
+      }
+  }
+  mypath <- paste(symbol, ".csv", sep = "") 
+  #csvファイルに保存する
+  write.csv(forecasts, file= mypath, row.names=FALSE)
+
+```
+
+## pythonの処理
+
+一日ずらしてる、セルを分割
+
+```{python}
+#def dataclean(symbol):
+forecasts = open("998407.csv", "r").readlines()
+old_value = 1
+new_list = []
+for f in forecasts[1:]:
+    strpf = f.replace('"','').strip()
+    new_str = "%s,%s\n" % (strpf, old_value)
+    newspl = new_str.strip().split(",")
+    final_str = "%s,%s\n" % (newspl[0], newspl[2])
+    final_str = final_str.replace('"','')
+    old_value = f.strip().split(',')[1]
+    new_list.append(final_str)
+
+out = open("998407_new.csv", "w")
+for n in new_list:
+    out.write(n)
+```
+
+
+```{r}
+spArimaGarch = as.xts( 
+  read.zoo(
+    file="998407_new.csv", format="%Y-%m-%d", header=F, sep=","
+  )
+)
+
+# Create the ARIMA+GARCH returns
+spIntersect = merge( spArimaGarch[,1], spReturns, all=F ) #all=F:日付が重なる部分のみとりだす
+spArimaGarchReturns = spIntersect[,1] * spIntersect[,2]
+
+# Create the backtests for ARIMA+GARCH and Buy & Hold
+# cumprod:累積積
+spArimaGarchCurve = log( cumprod( 1 + spArimaGarchReturns ) )
+spBuyHoldCurve = log( cumprod( 1 + spIntersect[,2] ) )
+spCombinedCurve = merge( spArimaGarchCurve, spBuyHoldCurve, all=F )
+
+# check
+head(spArimaGarchCurve)
+head(spBuyHoldCurve)
+head(spCombinedCurve)
+
+# Plot the equity curves
+xyplot( 
+  spCombinedCurve,
+  superpose=T,
+  col=c("darkred", "darkblue"),
+  lwd=2,
+  key=list( 
+    text=list(
+      c("ARIMA+GARCH", "Buy & Hold")
+    ),
+    lines=list(
+      lwd=2, col=c("darkred", "darkblue")
+    )
+  )
+)
+
+#収束判定
+#1.1以下？？
+a <- as.mcmc(spArimaGarchCurve)
+coda::traceplot(a)
+geweke.diag(a)
+
+
+```
+
+# データ取得
+
+```{r,eval=FALSE}
+## 日次対数return作成関数
+get.day.return <- function(symbol, sday, eday) {
+    org.data <- getSymbols(symbol,src="yahooj",from=sday,
+                           to=eday, auto.assign = FALSE)
+    return <- diff(log(Cl(org.data))) * 100 #対数リターンの計算
+    as.matrix(return[-1,])
+}
+## 日付データを取得
+get.day <- function(symbol, sday, eday){
+  org.data <- getSymbols(symbol[1],src="yahooj",from=sday,
+                           to=eday, auto.assign = FALSE)
+  time(org.data[-1,]) #日付データ取得
+}
+
+# 複数株価リターンの取得
+get.day.allreturn <- function(symbol, sday, eday){
+  date <- get.day(symbol[1],sday,eday)
+  size <- length(date) #行列の行数を決定する
+  
+  allreturn <- matrix(0,size,length(symbol))
+  allreturn <- mapply(get.day.return,symbol,sday,eday)
+  allreturn <- as.matrix(allreturn) #fportfolioに使うため
+  rownames(allreturn) <- as.character(date) 
+  allreturn
+  }
+```
+
+## 日経平均株価
+
+```{r,eval=FALSE}
+#日経平均株価:998407
+symbol <- 998407 %>% as.character
+sday <- as.Date("2005-1-1")
+eday <- as.Date("2015-12-31")
+system.time(N225.return <- get.day.return(symbol, sday, eday)) #4,17second
+system.time(getSymbols(symbol,src = "yahooj",from=sday,to =eday)) #2.69second
+```
+
+## 証券コード
+
+コードは順番に並んでいるから、ベクトル作れば全部持ってこれる
+以下参照
+http://kabukiso.com/apply/knowledge/code.html
+
+```{r ,eval=FALSE}
+#複数の株価例
+symbol <- list(998407) %>% as.character
+
+#http://www.nikkei.com/markets/kabu/nidxprice/?StockIndex=NAVE&Gcode=00&hm=1
+#日経平均株価225銘柄
+symbol <- c(4151,4502,4503,4506,4507,4519,4523,4568,6479,6501,6502,6503,6504,6506,6508,6674,6701,6702,6703,6752,8028,6758,6762,7272,6770,6773,6841,6857,6902,6952,6954,6971,6976,7735,7751,7752,8035,7201,7202,7203,7205,7211,7261,7267,7269,7270,4543,4902,7731,7733,7762,9412,9432,9433,9437,9613,9984,8303,8304,8306,8308,8309,8316,8331,4578,8354,8355,8411,8253,8601,8604,8628,8630,8725,8729,8750,8766,8795,1332,1333,2002,2269,2282,2501,2502,2503,2531,2801,2802,2871,2914,3086,3099,3382,8233,8252,8267,4755,9983,2432,4324,4689,4704,9602,9681,9735,9766,1605,3101,3103,3105,3401,3402,3861,3863,3865,3405,3407,4004,4005,4021,7186,4042,4043,4061,4063,4183,4188,4208,4272,4452,4901,4911,6988,5002,5020,5101,5108,5201,5202,5214,5232,5233,5301,5332,5333,5401,5406,5411,5413,5541,3436,5703,5706,5707,5711,5713,5714,5715,5801,5802,5803,5901,2768,8001,8002,8015,8031,8053,8058,1721,1801,1802,1803,1808,1812,1925,1928,1963,5631,6103,6113,6301,6302,6305,6326,6361,6366,6367,6471,6472,6473,7004,7011,7013,7003,7012,7911,7912,7951,3289,8801,8802,8804,8830,9001,9005,9007,9008,9009,9020,9021,9022,9062,9064,9101,9104,9107,9202,9301,9501,9502,9503,9531,9532) %>% as.character()
+
+#日付
+sday <- as.Date("2012-5-1")
+eday <- as.Date("2017-5-1")
+
+#同時に取得！！
+#system.time()関数:1つの株価の1年分を取得するのに約6秒
+result <- get.day.allreturn(symbol,sday,eday)
+
+#全種類7年分取得しようとしたらエラー
+#Error in `rownames<-`(`*tmp*`, value = as.character(date)) : 
+#attempt to set 'rownames' on an object with no dimensions
+
+#Excel形式で保存
+#library(xlsx)
+write.xlsx(result, file = "all_return.xlsx", sheetName="Sheet1")
+
+#Excelファイルの読み込み
+dat <- read.xlsx("all_return.xlsx", sheetIndex=1) %>% as.timeSeries
+```
+
+```{r,eval=FALSE}
+#株価リターンのグラフ
+plot(ts(result))
+#株価リターンのヒストグラム
+#ggplot(N225.return) + geom_histogram(aes(x=N225.return$return))
+```
+
+```{r,eval=FALSE}
+#作成するフロンティアの条件設定.フロンティア上のポートフォリオを１０個作成。
+conditions <- portfolioSpec()
+setNFrontierPoints(conditions) <- 10   
+#データ、効率的フロンティアの作成
+efficientFrontier <- portfolioFrontier(result ,conditions)
+#効率的フロンティアを描画
+plot(efficientFrontier,1)
+#plot(efficientFrontier)後、選択画面から１を選択でも可能.
+#そのほか
+#最小リスクポートフォリオ（２）
+#接点ポートフォリオ（３）
+#各資産のリスクリターン平面での位置（４）
+#等ウェイトで保有した場合のポートフォリオ（５）
+#指定したデータの２資産ごとを保有した場合のフロンティア（６）
+#モンテカルロシミュレーションで算出したポートフォリオ（７）
+#シャープレシオ（８）
+#が追記描画可能（０で終了）
+
+weightsPlot(efficientFrontier)
+#各資産が全体のリスクをどのくらい占めているかというリスクで見た資産配分プロット（リスクバジェッティング）
+covRiskBudgetsPlot(efficientFrontier)
+#接点ポートフォリオ、各資産の位置等がデフォルトで記述される効率的フロンティア描画関数
+tailoredFrontierPlot(efficientFrontier)
+
+print(efficientFrontier)
+```
+
+```{r,eval=FALSE}
+#ウェイト制約を追加してみる。
+#1、2番目の資産の最低保有ウェイトがそれぞれ10%,20%
+#各資産の最大ウェイトが50%という意味
+weightConstraints <- c("minW[1:2]=c(0.1,0.2)","maxW[1:6]=0.5")
+efficientFrontier <- portfolioFrontier(result ,conditions,weightConstraints)
+#ウェイト制約が満たされているか確認
+print(efficientFrontier)
+#効率的フロンティアを描画
+plot(efficientFrontier,1)
+#以下のような特殊な描画が可能な関数も用意されている。
+#フロンティア上の点での資産ウェイトのプロット
+weightsPlot(efficientFrontier)
+#各資産が全体のリスクをどのくらい占めているかというリスクで見た資産配分プロット（リスクバジェッティング）
+covRiskBudgetsPlot(efficientFrontier)
+#接点ポートフォリオ、各資産の位置等がデフォルトで記述される効率的フロンティア描画関数
+tailoredFrontierPlot(efficientFrontier)
+
+#各資産を”グルーピング”して制約条件を課すことも可能
+#1番目の資産と2番目の資産の投資ウェイトの合計が30％以上、3番目と4番目の資産の合計が50%以下
+groupConstraints <- c("minsumW[c(1,2)]=0.3","maxsumW[c(3,4)]=0.5")
+#個別資産の投資ウェイト制約も同時に適用し効率的フロンティアを記述
+efficientFrontier <- portfolioFrontier(data ,conditions,c(weightConstraints,groupConstraints))
+#結果確認
+print(efficientFrontier)
+```

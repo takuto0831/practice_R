@@ -1,0 +1,319 @@
+---
+title: "Prophet_stock_price"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+# webpage catalogue
+
+[Prophet](https://www.r-bloggers.com/prophet-how-facebook-operationalizes-time-series-forecasting-at-scale/ "Prophet how to")
+
+[Forecasting at Scale](https://facebookincubator.github.io/prophet/static/prophet_paper_20170113.pdf)
+
+[Prophet for stock price](https://msperlin.github.io/2017-03-05-Prophet-and_stock-market/)
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# set working directory
+rm(list = ls(all.names = T))
+```
+
+# package difference
+
+```{r, eval=FALSE}
+library(BatchGetSymbols)
+library(quantmod)
+
+my.stocks  <- c('AAPL')
+first.date <- as.Date('2015-01-01')
+last.date <- Sys.Date() # 現在の日時取得
+# data.frame形式になる
+df.stocks <- BatchGetSymbols(my.stocks, 
+                             first.date = first.date, 
+                             last.date = last.date)[[2]]
+#xts形式になる,ticker列,時間列がない
+df.stocks_2 <- getSymbols(Symbols = my.stocks, 
+                          from=first.date, 
+                          to=last.date, 
+                          auto.assign = FALSE)
+```
+
+# library package 
+
+```{r, message = FALSE}
+library(BatchGetSymbols)
+library(prophet)
+library(ggplot2)
+library(zoo)
+library(lattice)
+library(dplyr)
+library(broom)
+```
+
+```{r}
+#road data
+load("C:/Users/SHIO-160412-4/Desktop/R_prophet/data/SP500.RData")
+dim(df.stocks)
+tail(df.stocks)
+```
+
+```{r, eval=FALSE}
+# 乱数シード
+set.seed(15)
+# number of stocks
+n.stocks <- 30
+
+# unique:文字抽出
+my.stocks <- sample(unique(df.stocks$ticker), n.stocks)
+
+# 対象のデータのみ使う
+df.stocks <- df.stocks[df.stocks$ticker %in% my.stocks, ]
+```
+
+```{r, eval=FALSE}
+# example
+# 100個の乱数+100日分の時系列
+df.est <- data.frame(y = rnorm(100), ds = Sys.Date() + 1:100)
+
+m <- prophet(df = df.est)
+```
+
+# prophet function
+
+```{r}
+est.model.and.forecast <- function(df.in, nfor){
+  # Estimated model using prophet and forecast it
+  #
+  # Args:
+  #   df.in - A dataframe with columns price.adjusted and ref.date
+  #   nfor - Number of out-of-sample forecasts
+  #
+  # Returns:
+  #   A dataframe with forecasts and errors for each horizon.
+  
+  require(prophet)
+  require(dplyr)
+  
+  my.ticker <- df.in$ticker[1]
+  
+  #cat('\nProcessing ', my.ticker)
+  
+  # calculation return per
+  df.in$ret <- with(df.in, c(NA,diff(log(price.adjusted))))
+  
+  # extract date and return per
+  df.in <- select(df.in, ref.date, ret)
+  names(df.in) <- c('ds', 'y')
+  
+  # num of the training
+  idx <- nrow(df.in) - nfor
+  
+  # training data
+  df.est <- df.in[1:idx, ]
+  # test data
+  df.for <- df.in[(idx + 1):nrow(df.in), ]
+  
+  # all out put change for character
+  capture.output(
+    m <- prophet(df = df.est)
+  )
+  
+  # forecast 50 days ahead (it also includes non trading days)
+  df.pred <- predict(m,
+                     make_future_dataframe(m,
+                                           periods = nfor + 50))
+  
+  #### 土日も含めて予測して、その後元データと日付が一致している部分のみ取り出している
+  # merge real num and predict num
+  df.for <- merge(df.for, df.pred, by = 'ds')
+  df.for <- select(df.for, ds, y, yhat)
+  
+  # forecast statistics
+  df.for$eps <- with(df.for,y - yhat)
+  df.for$abs.eps <- with(df.for,abs(y - yhat))
+  df.for$perc.eps <- with(df.for,(y - yhat)/y)
+  df.for$nfor <- 1:nrow(df.for)
+  df.for$ticker <- my.ticker
+  
+  return(df.for)
+}
+```
+
+```{r}
+# 関数をtickerごとに繰り返す
+# リスト形式で返される
+out.l <- by(data = df.stocks,
+            INDICES = df.stocks$ticker, 
+            FUN = est.model.and.forecast, nfor = 30)
+
+# 縦にマージする
+my.result <- do.call(rbind, out.l)
+```
+
+# ggplot
+
+```{r}
+# abs.eps:difference of real num and predict num 
+p <- ggplot(my.result, aes(x=factor(nfor), y=abs.eps))
+p <- p + geom_boxplot()
+
+print(p)
+```
+
+# profit rate function
+
+```{r}
+profit_rate_func <- function(my.result){
+  # extract ticker
+  my.ticker <- my.result$ticker[1]
+
+  # extract date, y, yhat
+  my.result_return <- select(my.result, y , yhat) %>% as.zoo()
+  # get profit rate
+  my.result_profit <- apply(my.result_return, 2, function(i) log(cumprod(1 + i))) %>% as.zoo()
+  # input date
+  index(my.result_profit) <- my.result[,1] 
+  #plot
+  profit_plot <- 
+    xyplot( 
+    my.result_profit,
+    main = paste("stock name :", my.ticker, sep = ""),
+    superpose=T,
+    col=c("darkred", "darkblue"),
+    lwd=2,
+    key=list( 
+      text=list(
+        c("real number", "predict number")
+      ),
+      lines=list(
+        lwd=2, col=c("darkred", "darkblue")
+      )
+    )
+  )
+  return(profit_plot)
+}
+
+```
+
+```{r}
+# 関数をtickerごとに繰り返す
+# リスト形式で返される
+out.plot <- by(data = my.result,
+            INDICES = my.result$ticker, 
+            FUN = profit_rate_func)
+
+```
+
+# high profit return function
+
+```{r}
+profit_last_func <- function(my.result){
+  # extract ticker
+  my.ticker <- my.result$ticker[1]
+  
+  # extract date, y, yhat
+  my.result %>>% 
+    select(yhat) %>>% 
+    apply(2, function(i) log(cumprod(1 + i))) %>>% 
+    tail(n=1) %>>% 
+    (merge(my.ticker, .) -> last_return)
+  return(last_return)
+}
+
+```
+
+```{r}
+# 関数をtickerごとに繰り返す
+# リスト形式で返される
+out.last <- by(data =my.result,
+            INDICES = my.result$ticker, 
+            FUN = profit_last_func)
+
+# 縦にマージする
+my.result.last <- do.call(rbind, out.last)
+
+# good predict plot num = ??
+order(my.result.last$yhat) %>>%
+  tail(15) %>% 
+  as.vector() %>>%
+  my.result.last
+
+
+```
+
+
+```{r}
+# good predict 
+out.plot$FCX
+out.plot$EVHC
+out.plot$KMI
+out.plot$CSX
+out.plot$MUR
+out.plot$WYNN
+out.plot$OKE
+out.plot$MLM
+out.plot$NRG
+out.plot$AKAM
+out.plot$NAVI
+out.plot$MRO
+out.plot$NEM
+out.plot$KSU
+out.plot$FCX
+```
+
+
+
+
+# linear model
+
+```{r}
+lm.model <- lm(formula = y ~ yhat, data = my.result)
+summary(lm.model)
+```
+
+```{r}
+# separate by nfor
+models <- my.result %>%
+  dplyr::group_by(nfor) %>%
+  do(ols.model = lm(data = ., formula = y ~ yhat))
+knitr::kable(models %>% tidy(ols.model))
+
+```
+
+# trading based on forecasts
+
+strategy is:
+
+buy the stock in end of day t if forecast in t+1 is positive and sell at the end of t+1
+short-sell the stock in the end of day t when forecast for t+1 is negative and buy it back in the end of t+1
+
+```{r}
+#(yhat>0):return False(0) or True(1)
+my.profit <- sum(with(my.result, (yhat>0)*y + (yhat<0)*-y))
+print(my.profit)
+```
+
+compares to random traiding signals
+
+```{r}
+n.sim <- 10000
+
+monkey.ret <- numeric(length = n.sim)
+for (i in seq(n.sim)) {
+  rnd.vec <- rnorm(length(my.result$y))
+  
+  monkey.ret[i] <- sum((rnd.vec>0)*my.result$y + (rnd.vec<0)*-my.result$y)
+  } 
+
+temp.df <- data.frame(monkey.ret, my.profit)
+p <- ggplot(temp.df, aes(monkey.ret)) 
+p <- p + geom_histogram()
+p <- p + geom_vline(aes(xintercept =  my.profit),size=2)
+p <- p + labs(x='Returns from random trading signals')
+print(p)
+
+```
+
