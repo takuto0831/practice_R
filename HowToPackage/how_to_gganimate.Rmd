@@ -8,11 +8,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-#devtools::install_github("thomasp85/gganimate")
+# devtools::install_github("tidyverse/ggplot2")
+# devtools::install_github("thomasp85/gganimate")
+# gdtools
 library(gapminder)
 library(ggplot2)
 library(gganimate)
-library(TDA)
+# library(TDA)
 library(dplyr)
 ```
 
@@ -91,6 +93,25 @@ animation::ani.options(interval = 1/24)
 animate(p, 'dropping balls.gif', title_frame = F)
 ```
 
+# sample3
+
+```{r}
+library(sf)
+library(rnaturalearth)
+earth <- sf::st_as_sf(rnaturalearth::countries110)
+views <- data.frame(rbind(
+  st_bbox(earth[earth$name == 'Japan',]), # 日本が含まれる区画, 緯度経度の最大値, 最小値
+  st_bbox(earth[earth$name == 'Belgium',]),
+  st_bbox(earth[earth$name == 'Canada',])
+))
+p <- ggplot() + 
+  geom_sf(data = earth, fill = 'white') + 
+  geom_sf(data = earth[earth$name %in% c('Japan', 'Belgium','Canada'),], fill = 'forestgreen') + 
+  theme(panel.background = element_rect('lightblue')) + 
+  view_zoom_manual(1, 1, xmin = views$xmin, xmax = views$xmax, ymin = views$ymin, ymax = views$ymax, wrap = TRUE)
+animate(p, 100, 10)
+```
+
 
 # TDA
 
@@ -119,7 +140,8 @@ for (i in 1:2) {
 ggplot(test, aes(x=Sepal.Length, y=Sepal.Width,size=pop)) +
   geom_point(shape = 21,alpha=0.3,colour="black",fill="skyblue") +
   geom_point(size = 1) +
-  scale_size_continuous(range = c(1, 30)) +
+  scale_size(range = c(1,30)) +
+  #scale_size_continuous(range = c(1, 30)) +
   guides(size=FALSE)
 ```
 
@@ -128,7 +150,8 @@ p <-
   ggplot(test, aes(x=Sepal.Length, y=Sepal.Width,size=pop)) +
   geom_point(shape = 21,alpha=0.3,colour="black",fill="skyblue") +
   geom_point(size = 1) +
-  scale_size_continuous(range = c(1, 30)) +
+  scale_size(range = c(1,30)) +
+  #scale_size_continuous(range = c(1, 30)) +
   guides(size=FALSE) +
   transition_time(pop) +
   ease_aes('linear')
