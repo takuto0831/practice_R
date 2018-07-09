@@ -16,9 +16,9 @@ library(foreach)
 library(readr)
 
 # layer
-japan_map <- st_read("shape/japan_ver81.shp")
+japan_map <- st_read("/Users/takuto/Documents/DIP_intern/shape/japan_ver81.shp")
 # csv
-data <- read_csv("geo_customer_store.csv")
+data <- read_csv("/Users/takuto/Desktop/test/geo_customer_store.csv")
 data_ <- data %>% 
   filter(lon > 138.5 & lon < 141) %>% 
   filter(lat > 34.8 & lat < 36.4) %>% 
@@ -63,5 +63,9 @@ ggplot() +
   facet_wrap(~mode_store) +
   theme_classic() +
   theme(legend.position = "none",
-        panel.grid.major = element_line(color = "white")
+        panel.grid.major = element_line(color = "white"),
+        axis.text.y = element_blank(), # label remove
+        axis.text.x = element_blank(), # label remove
+        axis.ticks.x = element_blank(), # ticks remove
+        axis.ticks.y = element_blank()
   ) 
