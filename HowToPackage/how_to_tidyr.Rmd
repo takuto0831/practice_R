@@ -5,50 +5,99 @@ date: "2017年6月4日"
 output: html_document
 ---
 
-[tydir for blog](http://uribo.hatenablog.com/entry/2015/12/01/055000)
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r include=FALSE}
 library(tidyr)
-library(ggplot2)
-library(broom)
 library(dplyr)
-library(readr)
-library(pipeR)
-library(magrittr)
+library(DT)
+library(ggplot2)
+library(summarytools)
+library(gapminder)
+```
+
+```{r view}
+dfSummary(gapminder) %>% 
+  view(method = "render")
 ```
 
 ```{r}
-df_uryu <- readr::read_delim("csv/sample_data.csv",
-                             delim = ",",
-                             na     = "na",
-                             col_types = list(
-                              spc_japan = col_character() 
-                             ),
-                             skip   = 86)
+ggplot(gapminder) +
+  geom_line(aes(year,lifeExp,group = country))
+```
+
+## nest
+
+- 複数要素をまとめる
+
+```{r}
+by_country <- gapminder %>% 
+  group_by(continent,country) %>% 
+  nest()
+by_country
 ```
 
 ```{r}
-names(df_uryu)
+by_country$data[[1]]
+```
+
+## map 
+
+- List に対して, 処理
+
+```{r}
+by_country <- by_country %>% 
+  mutate(model = purrr::map(data, ~ lm(lifeExp ~ year,data = .)))
+by_country
+```
+
+## unnest
+
+- nest 解除
+
+```{r}
+by_country %>% unnest(data)
+```
+
+## broom
+
+```{r}
+library(broom)
+# extract model and fit summaries
+by_country %>% unnest(model %>% purrr::map(broom::glance)) 
+# extract coefficients
+by_country %>% unnest(model %>% purrr::map(broom::tidy))
+# extract residuals etc
+by_country %>% unnest(model %>% purrr::map(broom::augment))
+```
+
+# complete
+
+- 欠損データを補完
+- 非指定カラムはNA
+
+```{r}
+resources <- frame_data(
+  ~year, ~metric, ~value,
+  1999, "coal", 100,
+  2001, "coal", 50,
+  2001, "steel", 200
+)
+resources
 ```
 
 ```{r}
-# %<>% pipeして戻す
-df_uryu %<>% dplyr::select(-ends_with("cord"), -contains("s_date"),
-                           -starts_with("stem"), -starts_with("indv_no"),
-                           -tag_no05, -tag_no09) 
+# 全パターンを表示
+resources %>% 
+  complete(year,metric)
+# 補完方法を指定
+resources %>% 
+  complete(year = full_seq(year, 1L), metric)
+# 複数を一つとして考える
+resources %>% 
+  complete(nesting(year,metric))
 ```
 
-```{r}
-glimpse(df_uryu)
-```
-
-```{r}
-# 文字列変換
-# ほかの列にも同時にできない？？？
-df_uryu[,2] <- data.frame(lapply(df_uryu[,2], iconv)) 
-```
 
