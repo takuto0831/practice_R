@@ -17,9 +17,11 @@ library(scales)
 ```
 
 Sidebar {.sidebar}
-=====================================
+===========================================
   
 ```{r}
+# input sidebar
+# stock1: variable name, Stock 1: display name, SPY: Stock name
 
 fluidRow(
   column(6,
@@ -144,7 +146,6 @@ monte_carlo_sim_51 <- eventReactive(input$go, {
   gather(sim, growth, -month) %>% 
   group_by(sim) %>% 
   mutate_all(funs(round(., 2)))
-  
 })
 
 ```
