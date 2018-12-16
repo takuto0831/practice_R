@@ -2,6 +2,24 @@
 
 各種パッケージの使い方, 応用例を実行. file名を参照して確認可能
 
+## 内容
+
+- How_to_package
+
+各種パッケージのお試し
+
+- Some_Classifiers
+
+ベイジアンネットワーク, ナイーブベイズ等による分類
+
+- prophet
+
+facebookの提供する時系列モデルに対する予測を動的に行うパッケージ
+
+- web_scraping
+
+ウェブスクレイピングを行うコード
+
 ```
 ├── How_to_Package
 │   ├── BNSL.R
